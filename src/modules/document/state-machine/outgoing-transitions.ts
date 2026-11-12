@@ -26,12 +26,12 @@ export const outgoingTransitions: TransitionRule[] = [
     notifyTitleTemplate: "Dự thảo văn bản đi mới chờ duyệt sơ bộ",
   },
 
-  // 2. Trưởng phòng duyệt đạt -> Chuyển Lãnh đạo phê duyệt/ký
+  // 2. Trưởng phòng / Lãnh đạo đơn vị duyệt đạt -> Chuyển Lãnh đạo phê duyệt/ký
   {
     from: "PENDING_REVIEW",
     action: "REVIEW_APPROVE",
     to: "PENDING_APPROVAL",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.OUTGOING_REVIEW,
     labelVi: "Duyệt & Trình Lãnh đạo",
     isOptimisticAllowed: true,
@@ -39,12 +39,12 @@ export const outgoingTransitions: TransitionRule[] = [
     notifyTitleTemplate: "Dự thảo văn bản đi chờ Lãnh đạo phê duyệt và ký",
   },
 
-  // 3. Trưởng phòng trả lại dự thảo
+  // 3. Trưởng phòng / Lãnh đạo đơn vị trả lại dự thảo
   {
     from: "PENDING_REVIEW",
     action: "REVIEW_REJECT",
     to: "RETURNED",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.OUTGOING_REVIEW,
     requiresReason: true,
     labelVi: "Trả lại dự thảo",
@@ -179,7 +179,7 @@ export const outgoingTransitions: TransitionRule[] = [
     from: "PENDING_REVIEW",
     action: "CANCEL",
     to: "CANCELLED",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.OUTGOING_CANCEL,
     requiresReason: true,
     labelVi: "Hủy văn bản",

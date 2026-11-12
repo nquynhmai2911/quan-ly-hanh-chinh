@@ -195,19 +195,32 @@ export async function POST(request: NextRequest) {
       // Tạo chuỗi duyệt nối tiếp mặc định
       const deptHead = await tx.userPositionRole.findFirst({
         where: {
-          role: { code: "DEPT_HEAD" },
+          role: { code: { in: ["DEPT_HEAD", "LEADER"] } },
           userPosition: { unitId: draftUnitId, endedAt: null },
         },
         select: { userPosition: { select: { userId: true } } },
       });
 
-      const leader = await tx.userPositionRole.findFirst({
-        where: {
-          role: { code: "LEADER" },
-          userPosition: { endedAt: null },
-        },
-        select: { userPosition: { select: { userId: true } } },
-      });
+      const leader =
+        (await tx.userPositionRole.findFirst({
+          where: {
+            role: { code: "LEADER" },
+            userPosition: {
+              endedAt: null,
+              ...(deptHead?.userPosition.userId
+                ? { userId: { not: deptHead.userPosition.userId } }
+                : {}),
+            },
+          },
+          select: { userPosition: { select: { userId: true } } },
+        })) ||
+        (await tx.userPositionRole.findFirst({
+          where: {
+            role: { code: "LEADER" },
+            userPosition: { endedAt: null },
+          },
+          select: { userPosition: { select: { userId: true } } },
+        }));
 
       if (!deptHead || !leader)
         throw new BusinessError(

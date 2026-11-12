@@ -35,7 +35,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border select-none",
+        "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border select-none whitespace-nowrap shrink-0",
         variants[variant],
         className,
       )}
@@ -124,7 +124,7 @@ export function DocumentStatusBadge({ status }: { status: DocumentStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded px-2 py-0.5 text-xs font-medium border select-none",
+        "inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium border select-none whitespace-nowrap shrink-0",
         config.className,
       )}
     >
@@ -137,14 +137,14 @@ export function DocumentStatusBadge({ status }: { status: DocumentStatus }) {
 export function UrgencyBadge({ level }: { level: UrgencyLevel }) {
   if (level === "FIRE") {
     return (
-      <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800 border border-rose-300 animate-pulse">
-        <Flame className="h-3 w-3" /> Hỏa tốc
+      <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800 border border-rose-300 animate-pulse whitespace-nowrap shrink-0">
+        <Flame className="h-3 w-3 shrink-0" /> Hỏa tốc
       </span>
     );
   }
   if (level === "URGENT") {
     return (
-      <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-300">
+      <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-300 whitespace-nowrap shrink-0">
         Khẩn
       </span>
     );
@@ -156,21 +156,21 @@ export function UrgencyBadge({ level }: { level: UrgencyLevel }) {
 export function SecurityBadge({ level }: { level: SecurityLevel }) {
   if (level === "TOP_SECRET") {
     return (
-      <span className="inline-flex items-center gap-1 rounded bg-red-900 px-2 py-0.5 text-xs font-bold text-white border border-red-950">
-        <ShieldAlert className="h-3 w-3" /> Tuyệt mật
+      <span className="inline-flex items-center gap-1 rounded bg-red-900 px-2 py-0.5 text-xs font-bold text-white border border-red-950 whitespace-nowrap shrink-0">
+        <ShieldAlert className="h-3 w-3 shrink-0" /> Tuyệt mật
       </span>
     );
   }
   if (level === "SECRET") {
     return (
-      <span className="inline-flex items-center rounded bg-rose-800 px-2 py-0.5 text-xs font-semibold text-white border border-rose-900">
+      <span className="inline-flex items-center rounded bg-rose-800 px-2 py-0.5 text-xs font-semibold text-white border border-rose-900 whitespace-nowrap shrink-0">
         Tối mật
       </span>
     );
   }
   if (level === "CONFIDENTIAL") {
     return (
-      <span className="inline-flex items-center rounded bg-orange-700 px-2 py-0.5 text-xs font-semibold text-white border border-orange-800">
+      <span className="inline-flex items-center rounded bg-orange-700 px-2 py-0.5 text-xs font-semibold text-white border border-orange-800 whitespace-nowrap shrink-0">
         Mật
       </span>
     );

@@ -110,36 +110,36 @@ export default function IncomingDocumentsPage() {
   const columns: ColumnDef<IncomingItem, unknown>[] = [
     {
       accessorKey: "documentNumber",
-      header: "Số đến",
+      header: () => <span className="whitespace-nowrap">Số đến</span>,
       cell: ({ row }) => (
-        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded whitespace-nowrap inline-flex items-center">
           {row.original.documentNumber || "Chưa có"}
         </span>
       ),
     },
     {
       accessorKey: "originalCode",
-      header: "Ký hiệu gốc",
+      header: () => <span className="whitespace-nowrap">Ký hiệu gốc</span>,
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-slate-700">
+        <span className="font-mono text-xs text-slate-700 whitespace-nowrap">
           {row.original.originalCode || "—"}
         </span>
       ),
     },
     {
       accessorKey: "senderName",
-      header: "Nơi gửi",
+      header: () => <span className="whitespace-nowrap">Nơi gửi</span>,
       cell: ({ row }) => (
-        <span className="text-xs text-slate-800 font-medium">
+        <span className="text-xs text-slate-800 font-medium whitespace-nowrap">
           {row.original.senderOrg?.name || row.original.senderName || "Nội bộ"}
         </span>
       ),
     },
     {
       accessorKey: "title",
-      header: "Trích yếu nội dung",
+      header: () => <span className="whitespace-nowrap">Trích yếu nội dung</span>,
       cell: ({ row }) => (
-        <div className="max-w-md">
+        <div className="min-w-[240px] max-w-lg">
           <p className="font-semibold text-slate-900 line-clamp-2 hover:text-indigo-600 transition-colors">
             {row.original.title}
           </p>
@@ -147,8 +147,8 @@ export default function IncomingDocumentsPage() {
             <UrgencyBadge level={row.original.urgency} />
             <SecurityBadge level={row.original.security} />
             {row.original.processingDeadline && (
-              <span className="text-[10px] text-amber-600 flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded">
-                <Clock className="h-3 w-3" />
+              <span className="text-[10px] text-amber-600 flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded whitespace-nowrap">
+                <Clock className="h-3 w-3 shrink-0" />
                 Hạn:{" "}
                 {new Date(row.original.processingDeadline).toLocaleDateString(
                   "vi-VN",
@@ -161,20 +161,24 @@ export default function IncomingDocumentsPage() {
     },
     {
       accessorKey: "status",
-      header: "Trạng thái",
-      cell: ({ row }) => <DocumentStatusBadge status={row.original.status} />,
+      header: () => <span className="whitespace-nowrap">Trạng thái</span>,
+      cell: ({ row }) => (
+        <div className="whitespace-nowrap">
+          <DocumentStatusBadge status={row.original.status} />
+        </div>
+      ),
     },
     {
       id: "handler",
-      header: "Người chủ trì",
+      header: () => <span className="whitespace-nowrap">Người chủ trì</span>,
       cell: ({ row }) => {
         const main = row.original.handlers?.[0];
         if (!main)
           return (
-            <span className="text-slate-400 italic text-xs">Chưa giao</span>
+            <span className="text-slate-400 italic text-xs whitespace-nowrap">Chưa giao</span>
           );
         return (
-          <div className="text-xs">
+          <div className="text-xs whitespace-nowrap">
             <span className="font-medium text-slate-800">
               {main.assignee?.fullName || "Chưa phân công"}
             </span>
@@ -187,19 +191,19 @@ export default function IncomingDocumentsPage() {
     },
     {
       id: "actions",
-      header: "Thao tác",
+      header: () => <span className="whitespace-nowrap text-right block pr-2">Thao tác</span>,
       cell: ({ row }) => (
         <div
-          className="flex items-center gap-1.5"
+          className="flex items-center justify-end gap-1.5 whitespace-nowrap pr-2"
           onClick={(e) => e.stopPropagation()}
         >
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-xs whitespace-nowrap shrink-0 px-2.5"
             onClick={() => router.push(`/documents/${row.original.id}`)}
           >
-            <Eye className="h-3.5 w-3.5 mr-1 text-slate-500" />
+            <Eye className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
             Chi tiết
           </Button>
         </div>

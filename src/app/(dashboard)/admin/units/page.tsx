@@ -103,15 +103,15 @@ export default function AdminUnitsPage() {
       </div>
 
       {/* Cây cấu trúc bảng */}
-      <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-xs">
-        <table className="w-full text-left text-sm text-slate-700">
+      <div className="bg-white rounded border border-slate-200 overflow-x-auto shadow-xs">
+        <table className="w-full min-w-[750px] text-left text-sm text-slate-700">
           <thead className="bg-slate-100 text-xs font-semibold text-slate-600 uppercase border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3">Tên Đơn vị / Phòng ban</th>
-              <th className="px-4 py-3">Ký hiệu viết tắt</th>
-              <th className="px-4 py-3">Cấp bậc</th>
-              <th className="px-4 py-3">Nhân sự hiện hành</th>
-              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3 whitespace-nowrap">Tên Đơn vị / Phòng ban</th>
+              <th className="px-4 py-3 whitespace-nowrap">Ký hiệu viết tắt</th>
+              <th className="px-4 py-3 whitespace-nowrap">Cấp bậc</th>
+              <th className="px-4 py-3 whitespace-nowrap">Nhân sự hiện hành</th>
+              <th className="px-4 py-3 whitespace-nowrap">Trạng thái</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

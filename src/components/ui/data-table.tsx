@@ -106,12 +106,12 @@ export function DataTable<TData, TValue>({
             <EmptyState />
           </div>
         ) : (
-          <table className="w-full text-left text-sm text-slate-700 border-collapse">
-            <thead className="bg-slate-100/80 sticky top-0 z-10 text-xs font-semibold text-slate-600 uppercase tracking-wider border-b border-slate-200">
+          <table className="w-full min-w-[950px] text-left text-sm text-slate-700 border-collapse">
+            <thead className="bg-slate-100/90 sticky top-0 z-10 text-xs font-semibold text-slate-600 uppercase tracking-wider border-b border-slate-200">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="px-4 py-3 select-none">
+                    <th key={header.id} className="px-4 py-3 select-none whitespace-nowrap">
                       {header.isPlaceholder ? null : (
                         <div
                           className={

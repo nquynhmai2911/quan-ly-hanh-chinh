@@ -253,16 +253,16 @@ export default function AdminPositionsPage() {
       </div>
 
       {/* ── BẢNG DANH MỤC CHỨC DANH ────────────────────────────────────────── */}
-      <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-xs">
-        <table className="w-full text-left text-sm text-slate-700">
+      <div className="bg-white rounded border border-slate-200 overflow-x-auto shadow-xs">
+        <table className="w-full min-w-[850px] text-left text-sm text-slate-700">
           <thead className="bg-slate-100 text-xs font-semibold text-slate-600 uppercase border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3">Tên Chức danh</th>
-              <th className="px-4 py-3">Vai trò tương ứng (Role)</th>
-              <th className="px-4 py-3">Cấp bậc</th>
-              <th className="px-4 py-3">Số lượng cán bộ đang giữ</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3 text-right pr-6">Thao tác</th>
+              <th className="px-4 py-3 whitespace-nowrap">Tên Chức danh</th>
+              <th className="px-4 py-3 whitespace-nowrap">Vai trò tương ứng (Role)</th>
+              <th className="px-4 py-3 whitespace-nowrap">Cấp bậc</th>
+              <th className="px-4 py-3 whitespace-nowrap">Số lượng cán bộ đang giữ</th>
+              <th className="px-4 py-3 whitespace-nowrap">Trạng thái</th>
+              <th className="px-4 py-3 text-right pr-6 whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

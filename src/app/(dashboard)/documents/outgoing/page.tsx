@@ -90,32 +90,32 @@ export default function OutgoingDocumentsPage() {
   const columns: ColumnDef<OutgoingItem, unknown>[] = [
     {
       accessorKey: "documentNumber",
-      header: "Số / Ký hiệu",
+      header: () => <span className="whitespace-nowrap">Số / Ký hiệu</span>,
       cell: ({ row }) => (
-        <span className="font-mono text-xs font-bold text-slate-800">
+        <span className="font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
           {row.original.documentNumber || <span className="text-slate-400 italic">Dự thảo</span>}
         </span>
       ),
     },
     {
       id: "unit",
-      header: "Đơn vị soạn thảo",
+      header: () => <span className="whitespace-nowrap">Đơn vị soạn thảo</span>,
       cell: ({ row }) => (
-        <span className="text-xs text-slate-700 font-medium">
+        <span className="text-xs text-slate-700 font-medium whitespace-nowrap">
           {row.original.draftUnit?.name || "—"} ({row.original.draftUnit?.code})
         </span>
       ),
     },
     {
       accessorKey: "title",
-      header: "Trích yếu dự thảo",
+      header: () => <span className="whitespace-nowrap">Trích yếu dự thảo</span>,
       cell: ({ row }) => (
-        <div className="max-w-md">
+        <div className="min-w-[240px] max-w-md">
           <p className="font-semibold text-slate-900 line-clamp-2 hover:text-indigo-600 transition-colors">
             {row.original.title}
           </p>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-[10px] text-slate-400 font-mono">
+            <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">
               Tạo bởi: {row.original.creator?.fullName || "Chuyên viên"}
             </span>
             <UrgencyBadge level={row.original.urgency} />
@@ -126,22 +126,26 @@ export default function OutgoingDocumentsPage() {
     },
     {
       accessorKey: "status",
-      header: "Trạng thái",
-      cell: ({ row }) => <DocumentStatusBadge status={row.original.status} />,
+      header: () => <span className="whitespace-nowrap">Trạng thái</span>,
+      cell: ({ row }) => (
+        <div className="whitespace-nowrap">
+          <DocumentStatusBadge status={row.original.status} />
+        </div>
+      ),
     },
     {
       id: "approvals",
-      header: "Tiến độ duyệt",
+      header: () => <span className="whitespace-nowrap">Tiến độ duyệt</span>,
       cell: ({ row }) => {
         const apps = row.original.approvals || [];
-        if (apps.length === 0) return <span className="text-slate-400 italic text-xs">Chưa tạo chuỗi</span>;
+        if (apps.length === 0) return <span className="text-slate-400 italic text-xs whitespace-nowrap">Chưa tạo chuỗi</span>;
         return (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 whitespace-nowrap">
             {apps.map((a, i) => (
               <span
                 key={i}
                 title={`${a.role}: ${a.approver?.fullName || "Cán bộ"} (${a.status})`}
-                className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${
+                className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold whitespace-nowrap ${
                   a.status === "APPROVED"
                     ? "bg-emerald-100 text-emerald-800"
                     : a.status === "REJECTED"
@@ -158,10 +162,10 @@ export default function OutgoingDocumentsPage() {
     },
     {
       accessorKey: "signerName",
-      header: "Người ký",
+      header: () => <span className="whitespace-nowrap">Người ký</span>,
       cell: ({ row }) => (
-        <div className="text-xs">
-          <span className="font-medium text-slate-800">{row.original.signerName || "Chưa chọn"}</span>
+        <div className="text-xs whitespace-nowrap">
+          <span className="font-medium text-slate-800 block">{row.original.signerName || "Chưa chọn"}</span>
           {row.original.signerPosition && (
             <span className="text-[10px] text-slate-400 block">{row.original.signerPosition}</span>
           )}
@@ -170,16 +174,16 @@ export default function OutgoingDocumentsPage() {
     },
     {
       id: "actions",
-      header: "Thao tác",
+      header: () => <span className="whitespace-nowrap text-right block pr-2">Thao tác</span>,
       cell: ({ row }) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap pr-2" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-xs whitespace-nowrap shrink-0 px-2.5"
             onClick={() => router.push(`/documents/${row.original.id}`)}
           >
-            <Eye className="h-3.5 w-3.5 mr-1 text-slate-500" />
+            <Eye className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
             Chi tiết
           </Button>
         </div>

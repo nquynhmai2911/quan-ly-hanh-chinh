@@ -375,7 +375,7 @@ export default function AdminDocumentTypesPage() {
           </div>
 
           {/* Bảng danh sách */}
-          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-x-auto">
             {isLoadingDocs ? (
               <div className="p-8 text-center text-sm text-slate-500 animate-pulse">
                 Đang tải danh mục loại hồ sơ...
@@ -385,16 +385,16 @@ export default function AdminDocumentTypesPage() {
                 Không tìm thấy loại hồ sơ nào phù hợp.
               </div>
             ) : (
-              <table className="w-full text-left text-sm text-slate-600">
+              <table className="w-full min-w-[850px] text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500 border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-4 w-16 text-center">STT</th>
-                    <th className="py-3 px-4">Tên loại hồ sơ / văn bản</th>
-                    <th className="py-3 px-4 w-32">Ký hiệu (Mã)</th>
-                    <th className="py-3 px-4">Mô tả hướng dẫn</th>
-                    <th className="py-3 px-4 w-32 text-center">Đang dùng</th>
-                    <th className="py-3 px-4 w-32 text-center">Trạng thái</th>
-                    <th className="py-3 px-4 w-28 text-right">Thao tác</th>
+                    <th className="py-3 px-4 w-16 text-center whitespace-nowrap">STT</th>
+                    <th className="py-3 px-4 whitespace-nowrap">Tên loại hồ sơ / văn bản</th>
+                    <th className="py-3 px-4 w-32 whitespace-nowrap">Ký hiệu (Mã)</th>
+                    <th className="py-3 px-4 whitespace-nowrap">Mô tả hướng dẫn</th>
+                    <th className="py-3 px-4 w-32 text-center whitespace-nowrap">Đang dùng</th>
+                    <th className="py-3 px-4 w-32 text-center whitespace-nowrap">Trạng thái</th>
+                    <th className="py-3 px-4 w-28 text-right whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

@@ -122,17 +122,17 @@ export default function AdminBooksPage() {
         </Button>
       </div>
 
-      <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-xs">
-        <table className="w-full text-left text-sm text-slate-700">
+      <div className="bg-white rounded border border-slate-200 overflow-x-auto shadow-xs">
+        <table className="w-full min-w-[850px] text-left text-sm text-slate-700">
           <thead className="bg-slate-100 text-xs font-semibold text-slate-600 uppercase border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3">Tên Sổ văn bản</th>
-              <th className="px-4 py-3">Mã sổ</th>
-              <th className="px-4 py-3">Hình thức</th>
-              <th className="px-4 py-3">Đơn vị áp dụng</th>
-              <th className="px-4 py-3">Mẫu số cấu hình</th>
-              <th className="px-4 py-3">Số hiện tại (Năm nay)</th>
-              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3 whitespace-nowrap">Tên Sổ văn bản</th>
+              <th className="px-4 py-3 whitespace-nowrap">Mã sổ</th>
+              <th className="px-4 py-3 whitespace-nowrap">Hình thức</th>
+              <th className="px-4 py-3 whitespace-nowrap">Đơn vị áp dụng</th>
+              <th className="px-4 py-3 whitespace-nowrap">Mẫu số cấu hình</th>
+              <th className="px-4 py-3 whitespace-nowrap">Số hiện tại (Năm nay)</th>
+              <th className="px-4 py-3 whitespace-nowrap">Trạng thái</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

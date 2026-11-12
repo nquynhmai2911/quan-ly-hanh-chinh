@@ -138,7 +138,7 @@ export async function DELETE(
     const { id } = await params;
 
     if (ctx.userId === id) {
-      throw new BusinessError("FORBIDDEN", "Bạn không thể khóa hoặc xóa tài khoản của chính mình.");
+      throw new BusinessError("FORBIDDEN", "Bạn không thể tự xóa tài khoản của chính mình.");
     }
 
     const user = await prisma.user.findUnique({
@@ -159,90 +159,74 @@ export async function DELETE(
       throw new BusinessError("FORBIDDEN", "Không thể xóa tài khoản Quản trị viên hệ thống gốc.");
     }
 
-    // Kiểm tra xem người dùng có phát sinh dữ liệu nghiệp vụ quan trọng (văn bản, xử lý, duyệt, ký số, hồ sơ lưu trữ) hay không
-    const [
-      createdDocs,
-      assignedHandlers,
-      assignedByHandlers,
-      documentApprovals,
-      signatures,
-      createdArchives,
-      incomingLed,
-      incomingManaged,
-      incomingRegistered,
-      auditLogs,
-    ] = await Promise.all([
-      prisma.document.count({ where: { creatorId: id } }),
-      prisma.documentHandler.count({ where: { assigneeId: id } }),
-      prisma.documentHandler.count({ where: { assignerId: id } }),
-      prisma.documentApproval.count({ where: { approverId: id } }),
-      prisma.documentSignature.count({ where: { signerId: id } }),
-      prisma.archive.count({ where: { creatorId: id } }),
-      prisma.incomingWorkflow.count({ where: { leaderId: id } }),
-      prisma.incomingWorkflow.count({ where: { headId: id } }),
-      prisma.incomingWorkflow.count({ where: { registrarId: id } }),
-      prisma.auditLog.count({ where: { actorId: id } }),
-    ]);
+    // Tìm tài khoản Admin hệ thống để tiếp nhận hồ sơ văn bản nếu có
+    const adminUser = await prisma.user.findFirst({
+      where: { employeeCode: "ADMIN001" },
+    });
+    const fallbackAdminId = adminUser ? adminUser.id : ctx.userId;
 
-    const hasData =
-      createdDocs > 0 ||
-      assignedHandlers > 0 ||
-      assignedByHandlers > 0 ||
-      documentApprovals > 0 ||
-      signatures > 0 ||
-      createdArchives > 0 ||
-      incomingLed > 0 ||
-      incomingManaged > 0 ||
-      incomingRegistered > 0 ||
-      auditLogs > 0;
-
-    if (hasData) {
-      // Vô hiệu hóa an toàn (Soft delete) để bảo toàn tính toàn vẹn dữ liệu
-      await prisma.user.update({
-        where: { id },
-        data: { isActive: false },
-      });
-      invalidateAuthContext(id);
-      return successResponse({
-        message: "Tài khoản đã được vô hiệu hóa / khóa an toàn do có liên kết hồ sơ văn bản lịch sử.",
-        deactivated: true,
-      });
-    }
-
-    // Nếu tài khoản chưa phát sinh dữ liệu văn bản nghiệp vụ, xóa sạch toàn bộ các bản ghi phụ thuộc trong transaction
     try {
       await prisma.$transaction(async (tx) => {
-        // 1. Xóa phân quyền trực tiếp
+        // 1. Chuyển giao các văn bản đã tạo sang Admin để không vi phạm khóa ngoại
+        await tx.document.updateMany({
+          where: { creatorId: id },
+          data: { creatorId: fallbackAdminId },
+        });
+
+        // 2. Cập nhật các luồng quy trình văn bản đến
+        await tx.incomingWorkflow.updateMany({
+          where: { registrarId: id },
+          data: { registrarId: null },
+        });
+        await tx.incomingWorkflow.updateMany({
+          where: { headId: id },
+          data: { headId: null },
+        });
+        await tx.incomingWorkflow.updateMany({
+          where: { leaderId: id },
+          data: { leaderId: null },
+        });
+
+        // 3. Dọn dẹp phân công xử lý, phê duyệt, ký số của người dùng
+        await tx.documentHandler.deleteMany({
+          where: { OR: [{ assigneeId: id }, { assignerId: id }] },
+        });
+        await tx.documentApproval.deleteMany({
+          where: { approverId: id },
+        });
+        await tx.documentSignature.deleteMany({
+          where: { signerId: id },
+        });
+
+        // 4. Chuyển giao hồ sơ lưu trữ và dọn dẹp audit log
+        await tx.archive.updateMany({
+          where: { creatorId: id },
+          data: { creatorId: fallbackAdminId },
+        });
+        await tx.auditLog.deleteMany({
+          where: { actorId: id },
+        });
+
+        // 5. Xóa phân quyền trực tiếp và vị trí chức vụ
         await tx.userPermission.deleteMany({
           where: { userId: id },
         });
 
-        // 2. Xóa các vai trò gắn với vị trí chức danh của người dùng
-        await tx.userPositionRole.deleteMany({
-          where: { userPosition: { userId: id } },
-        });
-
-        // 3. Xóa các vị trí chức danh công tác
-        await tx.userPosition.deleteMany({
+        const userPositions = await tx.userPosition.findMany({
           where: { userId: id },
+          select: { id: true },
         });
+        if (userPositions.length > 0) {
+          const upIds = userPositions.map((p) => p.id);
+          await tx.userPositionRole.deleteMany({
+            where: { userPositionId: { in: upIds } },
+          });
+          await tx.userPosition.deleteMany({
+            where: { userId: id },
+          });
+        }
 
-        // 4. Xóa thông báo liên quan
-        await tx.notification.deleteMany({
-          where: { OR: [{ recipientId: id }, { actorId: id }] },
-        });
-
-        // 5. Xóa lịch sử đã đọc văn bản
-        await tx.documentReader.deleteMany({
-          where: { userId: id },
-        });
-
-        // 6. Xóa các tệp tải lên tạm
-        await tx.pendingUpload.deleteMany({
-          where: { uploaderId: id },
-        });
-
-        // 7. Xóa tài khoản người dùng
+        // 6. Xóa vĩnh viễn tài khoản người dùng
         await tx.user.delete({
           where: { id },
         });
@@ -251,18 +235,19 @@ export async function DELETE(
       invalidateAuthContext(id);
 
       return successResponse({
-        message: "Đã xóa hoàn toàn tài khoản người dùng thành công.",
+        message: `Đã xóa vĩnh viễn tài khoản ${user.fullName} (${user.employeeCode}) thành công.`,
         deleted: true,
       });
-    } catch (deleteError) {
-      console.warn("Không thể xóa cứng tài khoản do ràng buộc dữ liệu, tự động chuyển sang khóa tài khoản an toàn:", deleteError);
+    } catch (txError) {
+      console.warn("Cascade delete error, falling back to soft deactivation:", txError);
+      // Fallback an toàn: nếu có bất kỳ ràng buộc CSDL nào khác, vô hiệu hóa tài khoản an toàn
       await prisma.user.update({
         where: { id },
         data: { isActive: false },
       });
       invalidateAuthContext(id);
       return successResponse({
-        message: "Tài khoản đã được vô hiệu hóa / khóa an toàn do có ràng buộc dữ liệu hệ thống.",
+        message: `Đã khóa tài khoản ${user.fullName} do có ràng buộc nghiệp vụ.`,
         deactivated: true,
       });
     }
@@ -270,4 +255,3 @@ export async function DELETE(
     return errorResponse(error);
   }
 }
-

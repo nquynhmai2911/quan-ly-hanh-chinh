@@ -43,7 +43,46 @@ async function login(email, password = "Demo@123") {
   assert.equal(r.status, 200);
   return r.response.headers.get("set-cookie").split(";")[0];
 }
+async function ensureStandardUsers() {
+  const bcrypt = require("bcryptjs");
+  const defaults = [
+    { email: "vanthu@eoffice.local", code: "VT001", name: "Lê Văn Cường", role: "CLERK", pos: "Văn thư", unit: "VP" },
+    { email: "giamdoc@eoffice.local", code: "GD001", name: "Nguyễn Văn An", role: "LEADER", pos: "Lãnh đạo", unit: "CQ" },
+    { email: "truongphong.tchc@eoffice.local", code: "TP001", name: "Trần Thị Bình", role: "LEADER", pos: "Lãnh đạo", unit: "TCHC" },
+    { email: "chuyenvien.tchc@eoffice.local", code: "CV001", name: "Phạm Thị Dung", role: "SPECIALIST", pos: "Chuyên viên", unit: "TCHC" },
+    { email: "nguoidan@eoffice.local", code: "CD001", name: "Nguyễn Văn Dân", role: "CITIZEN", pos: "Chuyên viên", unit: "CQ" },
+  ];
+  for (const d of defaults) {
+    const existing = await db.user.findFirst({ where: { OR: [{ email: d.email }, { employeeCode: d.code }] } });
+    if (!existing) {
+      const role = await db.role.findFirst({ where: { code: d.role } });
+      const pos = await db.position.findFirst({ where: { name: d.pos } }) || await db.position.findFirst();
+      const unit = await db.unit.findFirst({ where: { code: d.unit } }) || await db.unit.findFirst();
+      await db.user.create({
+        data: {
+          employeeCode: d.code,
+          email: d.email,
+          fullName: d.name,
+          passwordHash: await bcrypt.hash("Demo@123", 10),
+          isActive: true,
+          positions: {
+            create: {
+              unitId: unit.id,
+              positionId: pos.id,
+              isPrimary: true,
+              roles: { create: { roleId: role.id, dataScope: "ALL" } },
+            },
+          },
+        },
+      });
+    } else if (!existing.isActive) {
+      await db.user.update({ where: { id: existing.id }, data: { isActive: true } });
+    }
+  }
+}
+
 try {
+  await ensureStandardUsers();
   const admin = await login("admin@eoffice.local", "Admin@123"),
     citizen = await login("nguoidan@eoffice.local"),
     clerk = await login("vanthu@eoffice.local"),

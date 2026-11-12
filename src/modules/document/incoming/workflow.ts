@@ -102,7 +102,7 @@ export function incomingActions(
     add("SUBMIT_REVIEW", "PENDING_REVIEW");
   if (
     doc.status === "PENDING_REVIEW" &&
-    head &&
+    (head || leader || isAdmin(ctx)) &&
     (isAdmin(ctx) || ctx.permissions.has(Permissions.INCOMING_COMPLETE))
   ) {
     if (allReported) add("APPROVE_COMPLETE", "COMPLETED");

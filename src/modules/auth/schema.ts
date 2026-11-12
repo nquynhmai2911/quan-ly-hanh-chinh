@@ -6,10 +6,7 @@ import { z } from "zod";
 // ── Đăng nhập ───────────────────────────────────────────────────────────────
 
 export const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "Email không được để trống")
-    .email("Email không hợp lệ"),
+  email: z.string().min(1, "Vui lòng nhập email hoặc mã nhân viên"),
   password: z
     .string()
     .min(1, "Mật khẩu không được để trống")
@@ -22,16 +19,14 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z
-      .string()
-      .min(1, "Mật khẩu hiện tại không được để trống"),
+    currentPassword: z.string().min(1, "Mật khẩu hiện tại không được để trống"),
     newPassword: z
       .string()
       .min(6, "Mật khẩu mới tối thiểu 6 ký tự")
       .max(100, "Mật khẩu mới tối đa 100 ký tự")
       .regex(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
-        "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt"
+        "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt",
       ),
     confirmPassword: z.string().min(1, "Xác nhận mật khẩu không được để trống"),
   })

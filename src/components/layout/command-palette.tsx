@@ -92,7 +92,7 @@ export function CommandPalette() {
         <div className="max-h-80 overflow-y-auto p-2 divide-y divide-slate-100">
           {filtered.length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-500">
-              Không tìm thấy mục nào khớp với từ khóa "{query}"
+              Không tìm thấy mục nào khớp với từ khóa &ldquo;{query}&rdquo;
             </div>
           ) : (
             filtered.map((item) => (

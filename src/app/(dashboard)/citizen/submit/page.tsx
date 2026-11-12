@@ -1,394 +1,382 @@
-// src/app/(dashboard)/citizen/submit/page.tsx
-// Cổng Dịch vụ công & Tiếp nhận Văn bản / Đơn thư trực tuyến từ Người dân & Doanh nghiệp
-
 "use client";
-
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DocumentStatusBadge } from "@/components/ui/badge";
+import { DocumentStatus } from "@prisma/client";
 import { toast } from "sonner";
-import {
-  FileText,
-  Send,
-  UploadCloud,
-  CheckCircle2,
-  Clock,
-  Shield,
-  Phone,
-  Mail,
-  MapPin,
-  Building,
-  User,
-  ArrowRight,
-  HelpCircle,
-  FileCheck,
-} from "lucide-react";
 
+type Submission = {
+  id: string;
+  title: string;
+  status: DocumentStatus;
+  createdAt: string;
+  workflow: { trackingCode: string };
+  files: { id: string; fileName: string; fileSize: number }[];
+};
+const inputStyle = "w-full px-3 py-2 border border-slate-300 rounded text-sm";
+const initialForm = {
+  senderName: "",
+  senderPhone: "",
+  senderEmail: "",
+  senderAddress: "",
+  docType: "Đơn kiến nghị / Phản ánh",
+  urgency: "NORMAL",
+  title: "",
+  note: "",
+};
 export default function CitizenSubmitPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [submittedCode, setSubmittedCode] = useState<string | null>(null);
-  const [submittedDocId, setSubmittedDocId] = useState<string | null>(null);
-
-  const [form, setForm] = useState({
-    senderName: "Nguyễn Văn Dân",
-    senderPhone: "0912.345.678",
-    senderEmail: "nguoidan@eoffice.local",
-    senderAddress: "Số 15 đường Trần Phú, Phường 1, Thành phố",
-    docType: "Đơn kiến nghị / Phản ánh",
-    urgency: "NORMAL",
-    title: "",
-    note: "",
-    fileName: "",
-  });
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setForm((prev) => ({ ...prev, fileName: file.name }));
+  const [form, setForm] = useState(initialForm);
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<{
+    id: string;
+    onlineCode: string;
+  } | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [historyError, setHistoryError] = useState("");
+  const [canSubmit, setCanSubmit] = useState(false);
+  async function loadHistory() {
+    try {
+      const json = await (await fetch("/api/citizen/submit-document")).json();
+      if (!json.success)
+        throw new Error(json.error?.message || "Không tải được hồ sơ đã nộp.");
+      setSubmissions(json.data);
+      setHistoryError("");
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : "Không tải được hồ sơ.");
     }
   }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!form.title.trim()) {
-      toast.error("Vui lòng nhập trích yếu nội dung văn bản / đơn kiến nghị.");
-      return;
-    }
-    if (!form.senderName.trim()) {
-      toast.error("Vui lòng nhập họ tên người gửi.");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      let uploadedFileKey = "";
-
-      // Nếu người dân chọn tệp thực tế từ thiết bị, tải lên server lưu vào storage
-      if (selectedFile) {
-        try {
-          const fd = new FormData();
-          fd.append("file", selectedFile);
-          const upRes = await fetch("/api/upload", {
-            method: "POST",
-            body: fd,
-          });
-          const upJson = await upRes.json();
-          if (upJson.success && upJson.data?.fileKey) {
-            uploadedFileKey = upJson.data.fileKey;
-          }
-        } catch (uploadErr) {
-          console.warn("Upload file failed, fallback to metadata:", uploadErr);
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          setCanSubmit(
+            j.data.roles.some((r: string) => ["CITIZEN", "ADMIN"].includes(r)),
+          );
+          setForm((prev) => ({
+            ...prev,
+            senderName: j.data.user.fullName,
+            senderEmail: j.data.user.email,
+          }));
         }
+      });
+    const controller = new AbortController();
+    fetch("/api/citizen/submit-document", { signal: controller.signal })
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success)
+          throw new Error(
+            json.error?.message || "Không tải được hồ sơ đã nộp.",
+          );
+        setSubmissions(json.data);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setHistoryError(
+            error instanceof Error ? error.message : "Không tải được hồ sơ.",
+          );
+      });
+    return () => controller.abort();
+  }, []);
+  function chooseFiles(selected: FileList | null) {
+    if (!selected) return;
+    const next = [...files, ...Array.from(selected)];
+    if (next.length > 10) {
+      toast.error("Mỗi hồ sơ tối đa 10 tệp.");
+      return;
+    }
+    if (next.some((f) => f.size > 25 * 1024 * 1024)) {
+      toast.error("Mỗi tệp tối đa 25 MB.");
+      return;
+    }
+    setFiles(next);
+    setError("");
+  }
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!files.length) {
+      setError("Vui lòng đính kèm ít nhất một tệp gốc.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const attachments: { uploadId: string }[] = [];
+      for (const file of files) {
+        const data = new FormData();
+        data.append("file", file);
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: data,
+        });
+        const json = await response.json();
+        if (!response.ok || !json.success || !json.data.uploadId)
+          throw new Error(
+            `Không tải được tệp “${file.name}”: ${json.error?.message || "Vui lòng thử lại."}`,
+          );
+        attachments.push({ uploadId: json.data.uploadId });
       }
-
-      const res = await fetch("/api/citizen/submit-document", {
+      const response = await fetch("/api/citizen/submit-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          fileKey: uploadedFileKey,
-          fileName: selectedFile ? selectedFile.name : (form.fileName || "Don-kien-nghi-truc-tuyen.pdf"),
-          fileSize: selectedFile ? selectedFile.size : 450000,
-        }),
+        body: JSON.stringify({ ...form, attachments }),
       });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        toast.error(json.error?.message || "Không thể gửi văn bản.");
-        return;
-      }
-
-      setSubmittedCode(json.data.onlineCode);
-      setSubmittedDocId(json.data.id);
-      toast.success(json.data.message || "Gửi văn bản đến cơ quan thành công!");
-    } catch {
-      toast.error("Lỗi khi kết nối đến máy chủ.");
+      const json = await response.json();
+      if (!response.ok || !json.success)
+        throw new Error(json.error?.message || "Không thể nộp hồ sơ.");
+      setResult(json.data);
+      setFiles([]);
+      await loadHistory();
+      toast.success("Đã lưu hồ sơ và toàn bộ tệp đính kèm.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không kết nối được máy chủ.");
     } finally {
-      setIsLoading(false);
+      setBusy(false);
     }
   }
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Banner Cổng dịch vụ công */}
-      <div className="bg-linear-to-r from-indigo-900 via-indigo-800 to-indigo-950 text-white rounded-lg p-6 shadow-md border border-indigo-700/50">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 text-xs font-semibold mb-2 border border-indigo-400/30">
-              <Shield className="h-3.5 w-3.5" /> Cổng Tiếp nhận Văn bản & Đơn Thư Trực Tuyến
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              Gửi Văn Bản Đến Chờ Tiếp Nhận
-            </h1>
-            <p className="text-xs sm:text-sm text-indigo-200 mt-1 max-w-xl">
-              Hệ thống tiếp nhận điện tử 24/7 dành cho Người dân và Doanh nghiệp. Văn bản gửi đi sẽ được Văn thư cơ quan tiếp nhận, vào sổ và chuyển Lãnh đạo chỉ đạo xử lý đúng quy định.
-            </p>
-          </div>
-
-          <div className="hidden sm:block text-right">
-            <div className="bg-white/10 backdrop-blur-xs px-3.5 py-2.5 rounded border border-white/20 text-xs">
-              <span className="block text-indigo-200">Thời gian tiếp nhận</span>
-              <span className="font-bold text-white">Trong vòng 02 giờ làm việc</span>
-            </div>
-          </div>
-        </div>
+    <div className="max-w-4xl mx-auto space-y-6 pb-8">
+      <div className="bg-indigo-900 text-white rounded-lg p-6">
+        <h1 className="text-xl font-bold">Nộp văn bản đến qua dịch vụ công</h1>
+        <p className="mt-2 text-sm text-indigo-100">
+          Hồ sơ được gửi đến văn thư để tiếp nhận, vào sổ và chuyển xử lý. Bạn
+          có thể theo dõi hồ sơ đã nộp ở bên dưới.
+        </p>
       </div>
-
-      {submittedCode ? (
-        /* Màn hình thông báo gửi thành công */
-        <div className="bg-white rounded-lg border border-emerald-200 p-8 shadow-xs text-center space-y-5">
-          <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="h-10 w-10" />
-          </div>
-
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold text-slate-900">Nộp Văn Bản Trực Tuyến Thành Công!</h2>
-            <p className="text-xs text-slate-500">
-              Văn bản của bạn đã được chuyển đến bộ phận Văn thư cơ quan và đang ở trạng thái <strong>Chờ vào sổ tiếp nhận</strong>.
-            </p>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 max-w-md mx-auto space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Mã tra cứu hồ sơ:</span>
-              <span className="font-mono font-bold text-base text-indigo-600">{submittedCode}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Trạng thái hiện tại:</span>
-              <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                Chờ tiếp nhận vào sổ
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Người nộp:</span>
-              <span className="font-medium text-slate-800">{form.senderName}</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            {submittedDocId && (
-              <Button
-                variant="primary"
-                onClick={() => router.push(`/documents/${submittedDocId}`)}
-                className="gap-2"
-              >
-                <FileCheck className="h-4 w-4" /> Xem Tiến Độ Văn Bản
-              </Button>
-            )}
-            <Button
-              variant="outline"
+      {result ? (
+        <div className="border border-emerald-300 bg-emerald-50 rounded p-6 space-y-3">
+          <h2 className="font-bold">Đã nộp hồ sơ thành công</h2>
+          <p>
+            Mã tra cứu: <strong>{result.onlineCode}</strong>
+          </p>
+          <p>Trạng thái: Chờ tiếp nhận</p>
+          <div className="flex gap-3">
+            <Link
+              className="text-indigo-700 underline"
+              href={`/documents/${result.id}`}
+            >
+              Xem hồ sơ và tệp đã nộp
+            </Link>
+            <button
+              className="text-indigo-700 underline"
               onClick={() => {
-                setSubmittedCode(null);
-                setSubmittedDocId(null);
+                setResult(null);
                 setForm((prev) => ({ ...prev, title: "", note: "" }));
               }}
             >
-              Gửi thêm văn bản khác
-            </Button>
+              Nộp hồ sơ khác
+            </button>
           </div>
         </div>
-      ) : (
-        /* Form nộp văn bản */
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* 1. THÔNG TIN NGƯỜI GỬI */}
-          <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs space-y-4">
-            <h2 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2 border-b border-slate-100 pb-2">
-              <User className="h-4 w-4 text-indigo-600" />
-              1. Thông Tin Người Gửi / Doanh Nghiệp
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Họ và tên người gửi / Tên tổ chức, Doanh nghiệp *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.senderName}
-                  onChange={(e) => setForm({ ...form, senderName: e.target.value })}
-                  placeholder="Ví dụ: Nguyễn Văn Dân hoặc Công ty TNHH Phát triển X"
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Số điện thoại liên hệ *
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={form.senderPhone}
-                    onChange={(e) => setForm({ ...form, senderPhone: e.target.value })}
-                    placeholder="0912.xxx.xxx"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Email nhận thông báo kết quả
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <input
-                    type="email"
-                    value={form.senderEmail}
-                    onChange={(e) => setForm({ ...form, senderEmail: e.target.value })}
-                    placeholder="nguoidan@example.com"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Địa chỉ liên hệ
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={form.senderAddress}
-                    onChange={(e) => setForm({ ...form, senderAddress: e.target.value })}
-                    placeholder="Số nhà, đường, phường/xã, quận/huyện"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                  />
-                </div>
-              </div>
-            </div>
+      ) : canSubmit ? (
+        <form
+          onSubmit={submit}
+          className="space-y-5 bg-white border rounded-lg p-6"
+        >
+          <h2 className="font-semibold">Thông tin người gửi</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="text-sm">
+              Họ tên hoặc tên tổ chức *
+              <input
+                required
+                minLength={2}
+                maxLength={255}
+                className={inputStyle}
+                value={form.senderName}
+                onChange={(e) =>
+                  setForm({ ...form, senderName: e.target.value })
+                }
+              />
+            </label>
+            <label className="text-sm">
+              Số điện thoại *
+              <input
+                required
+                minLength={7}
+                maxLength={30}
+                className={inputStyle}
+                value={form.senderPhone}
+                onChange={(e) =>
+                  setForm({ ...form, senderPhone: e.target.value })
+                }
+              />
+            </label>
+            <label className="text-sm">
+              Thư điện tử liên hệ
+              <input
+                type="email"
+                className={inputStyle}
+                value={form.senderEmail}
+                onChange={(e) =>
+                  setForm({ ...form, senderEmail: e.target.value })
+                }
+              />
+            </label>
+            <label className="text-sm">
+              Địa chỉ liên hệ
+              <input
+                maxLength={500}
+                className={inputStyle}
+                value={form.senderAddress}
+                onChange={(e) =>
+                  setForm({ ...form, senderAddress: e.target.value })
+                }
+              />
+            </label>
+            <label className="text-sm">
+              Loại hồ sơ
+              <select
+                className={inputStyle}
+                value={form.docType}
+                onChange={(e) => setForm({ ...form, docType: e.target.value })}
+              >
+                {[
+                  "Đơn kiến nghị / Phản ánh",
+                  "Đơn đề nghị giải quyết thủ tục",
+                  "Công văn đề xuất",
+                  "Báo cáo tình hình",
+                  "Khác",
+                ].map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              Độ khẩn
+              <select
+                className={inputStyle}
+                value={form.urgency}
+                onChange={(e) => setForm({ ...form, urgency: e.target.value })}
+              >
+                <option value="NORMAL">Bình thường</option>
+                <option value="URGENT">Khẩn</option>
+                <option value="FIRE">Hỏa tốc</option>
+              </select>
+            </label>
           </div>
-
-          {/* 2. NỘI DUNG VĂN BẢN / ĐƠN THƯ */}
-          <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs space-y-4">
-            <h2 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2 border-b border-slate-100 pb-2">
-              <FileText className="h-4 w-4 text-indigo-600" />
-              2. Nội Dung Văn Bản / Đơn Thư Gửi Cơ Quan
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Loại văn bản / Thể thức *
-                </label>
-                <select
-                  value={form.docType}
-                  onChange={(e) => setForm({ ...form, docType: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                >
-                  <option value="Đơn kiến nghị / Phản ánh">Đơn kiến nghị / Phản ánh</option>
-                  <option value="Đơn đề nghị giải quyết thủ tục">Đơn đề nghị giải quyết thủ tục</option>
-                  <option value="Công văn đề xuất">Công văn đề xuất</option>
-                  <option value="Báo cáo tình hình">Báo cáo tình hình</option>
-                  <option value="Khác">Khác</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mức độ ưu tiên / Độ khẩn
-                </label>
-                <select
-                  value={form.urgency}
-                  onChange={(e) => setForm({ ...form, urgency: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                >
-                  <option value="NORMAL">Bình thường</option>
-                  <option value="URGENT">Khẩn</option>
-                  <option value="FIRE">Hỏa tốc</option>
-                </select>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Trích yếu nội dung văn bản / Tiêu đề đơn kiến nghị *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Ví dụ: Đơn kiến nghị giải quyết phản ánh về việc nâng cấp hệ thống đường điện dân sinh tại khu phố 3..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Ghi chú hoặc thông tin bổ sung (nếu có)
-                </label>
-                <input
-                  type="text"
-                  value={form.note}
-                  onChange={(e) => setForm({ ...form, note: e.target.value })}
-                  placeholder="Thông tin thêm giúp cơ quan xử lý nhanh hơn"
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 3. TỆP ĐÍNH KÈM / SCAN VĂN BẢN */}
-          <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs space-y-4">
-            <h2 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2 border-b border-slate-100 pb-2">
-              <UploadCloud className="h-4 w-4 text-indigo-600" />
-              3. Tệp Đính Kèm / Scan Đơn Có Chữ Ký
-            </h2>
-
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-indigo-500 transition-colors">
-              <UploadCloud className="h-10 w-10 text-slate-400 mx-auto mb-2" />
-              <p className="text-xs text-slate-700 font-medium">
-                {selectedFile ? (
-                  <span className="text-indigo-600 font-bold">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
-                ) : (
-                  "Kéo thả tệp PDF, Word, Ảnh chụp đơn thư hoặc bấm để chọn tệp"
-                )}
-              </p>
-              <p className="text-[11px] text-slate-400 mt-1">Định dạng hỗ trợ: PDF, DOCX, DOC, JPG, PNG (Tối đa 25MB)</p>
+          <label className="block text-sm">
+            Trích yếu nội dung *
+            <textarea
+              required
+              minLength={5}
+              maxLength={1000}
+              rows={3}
+              className={inputStyle}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+          </label>
+          <label className="block text-sm">
+            Thông tin bổ sung
+            <textarea
+              maxLength={1000}
+              rows={3}
+              className={inputStyle}
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+            />
+          </label>
+          <div className="border border-dashed rounded p-4 space-y-3">
+            <label className="block text-sm font-semibold">
+              Tệp đính kèm *
               <input
                 type="file"
-                id="file-upload"
-                onChange={handleFileChange}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                multiple
+                disabled={busy}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                className="block mt-2 text-sm"
+                onChange={(e) => {
+                  chooseFiles(e.target.files);
+                  e.target.value = "";
+                }}
               />
-              <label
-                htmlFor="file-upload"
-                className="inline-block mt-3 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded cursor-pointer transition-colors"
-              >
-                Chọn tệp từ thiết bị
-              </label>
-            </div>
+            </label>
+            <p className="text-xs text-slate-500">
+              Tối đa 10 tệp, mỗi tệp 25 MB. Hỗ trợ PDF, tài liệu Word, bảng tính
+              và ảnh.
+            </p>
+            <ul className="space-y-2">
+              {files.map((f, i) => (
+                <li
+                  key={`${i}-${f.name}`}
+                  className="flex justify-between text-sm gap-2"
+                >
+                  <span>
+                    {f.name} · {(f.size / 1024).toFixed(1)} KB
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="text-red-600"
+                    onClick={() =>
+                      setFiles((old) => old.filter((_, index) => index !== i))
+                    }
+                  >
+                    Bỏ tệp
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-
-          {/* Nút hành động */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-[11px] text-slate-500 flex items-center gap-1">
-              <HelpCircle className="h-3.5 w-3.5" />
-              Văn bản gửi đi sẽ được cấp mã tra cứu theo dõi trực tuyến ngay sau khi nộp
-            </span>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              isLoading={isLoading}
-              className="gap-2 px-6 h-10 font-bold"
-            >
-              <Send className="h-4 w-4" /> Gửi Văn Bản Đến Cơ Quan
-            </Button>
-          </div>
+          {error && (
+            <p role="alert" className="text-red-700">
+              {error}
+            </p>
+          )}
+          <Button type="submit" isLoading={busy}>
+            Gửi hồ sơ đến cơ quan
+          </Button>
         </form>
+      ) : (
+        <p>
+          Chức năng nộp hồ sơ dành cho tài khoản người dân. Văn thư tiếp nhận hồ
+          sơ trong danh sách văn bản đến.
+        </p>
       )}
+      <section className="bg-white border rounded-lg p-6 space-y-4">
+        <h2 className="font-bold">Hồ sơ đã nộp</h2>
+        {historyError && (
+          <p role="alert" className="text-red-700">
+            {historyError}
+          </p>
+        )}
+        {!submissions.length && !historyError && <p>Chưa có hồ sơ đã nộp.</p>}
+        {submissions.map((doc) => (
+          <article key={doc.id} className="border rounded p-4 space-y-2">
+            <div className="flex justify-between gap-2">
+              <Link
+                className="font-semibold text-indigo-700"
+                href={`/documents/${doc.id}`}
+              >
+                {doc.title}
+              </Link>
+              <DocumentStatusBadge status={doc.status} />
+            </div>
+            <p className="text-xs text-slate-500">
+              {doc.workflow.trackingCode} ·{" "}
+              {new Date(doc.createdAt).toLocaleString("vi-VN")}
+            </p>
+            <ul className="text-sm space-y-1">
+              {doc.files.map((f) => (
+                <li key={f.id}>
+                  <a
+                    className="text-indigo-600 underline"
+                    href={`/api/files/${f.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {f.fileName}
+                  </a>{" "}
+                  · {(f.fileSize / 1024).toFixed(1)} KB
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </section>
     </div>
   );
 }

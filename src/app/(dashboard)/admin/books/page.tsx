@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Plus, Hash, Tag } from "lucide-react";
+import { BookOpen, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 interface BookItem {
@@ -60,6 +60,7 @@ export default function AdminBooksPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBooks();
     // Tải units
     fetch("/api/admin/units")

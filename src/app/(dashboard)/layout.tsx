@@ -20,12 +20,22 @@ export default async function DashboardLayout({
 
   const authContext = await getAuthContext(user.id);
 
+  if (!authContext) redirect("/login?reauth=1");
+
   return (
     <DashboardShell
       user={user}
       roles={authContext?.roleCodes || []}
-      primaryPositionName={authContext?.primaryPosition?.positionName}
-      primaryUnitName={authContext?.primaryPosition?.unitName}
+      primaryPositionName={
+        authContext.roleCodes.includes("CITIZEN")
+          ? "Người dân"
+          : authContext.primaryPosition?.positionName
+      }
+      primaryUnitName={
+        authContext.roleCodes.includes("CITIZEN")
+          ? "Dịch vụ công"
+          : authContext.primaryPosition?.unitName
+      }
     >
       {children}
     </DashboardShell>

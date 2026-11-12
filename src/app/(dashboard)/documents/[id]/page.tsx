@@ -6,7 +6,12 @@
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Badge, DocumentStatusBadge, UrgencyBadge, SecurityBadge } from "@/components/ui/badge";
+import {
+  Badge,
+  DocumentStatusBadge,
+  UrgencyBadge,
+  SecurityBadge,
+} from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Drawer } from "@/components/ui/drawer";
 import {
@@ -26,8 +31,82 @@ import {
   Printer,
   ExternalLink,
 } from "lucide-react";
+import { IncomingActionDrawer } from "@/components/documents/incoming-action-drawer";
+import { AssignmentDrawer } from "@/components/documents/assignment-drawer";
+import {
+  actionLabel,
+  roleLabels,
+  processingLabels,
+} from "@/lib/display-labels";
 import { toast } from "sonner";
 import { AllowedAction } from "@/modules/document/state-machine";
+import type { DocumentStatus, SecurityLevel, UrgencyLevel } from "@prisma/client";
+
+interface DocumentFileItem {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  fileHash: string | null;
+  version: number;
+  mimeType: string | null;
+  uploader?: { fullName: string } | null;
+}
+
+interface DocumentHandlerItem {
+  id: string;
+  role: string;
+  status: string;
+  instruction: string | null;
+  reportContent: string | null;
+  assignee: { fullName: string };
+}
+
+interface DocumentApprovalItem {
+  id: string;
+  role: string;
+  status: string;
+  stepOrder: number;
+  comment: string | null;
+  approver?: { fullName: string } | null;
+}
+
+interface DocumentDetail {
+  id: string;
+  direction: "INCOMING" | "OUTGOING";
+  title: string;
+  documentNumber: string | null;
+  originalCode: string | null;
+  status: DocumentStatus;
+  urgency: UrgencyLevel;
+  security: SecurityLevel;
+  issuedDate: string | null;
+  processingDeadline: string | null;
+  senderName: string | null;
+  senderOrg?: { name: string } | null;
+  signerName: string | null;
+  recipientsSummary: string | null;
+  summaryNotes: string | null;
+  documentBook?: { name: string } | null;
+  documentType?: { name: string } | null;
+  workflow?: {
+    instruction: string | null;
+    trackingCode: string | null;
+    leader?: { fullName: string } | null;
+    head?: { fullName: string } | null;
+    unit?: { name: string } | null;
+  } | null;
+  files?: DocumentFileItem[];
+  handlers?: DocumentHandlerItem[];
+  approvals?: DocumentApprovalItem[];
+}
+
+interface AuditLogItem {
+  id: string;
+  action: string;
+  reason: string | null;
+  createdAt: string;
+  actor?: { fullName: string; employeeCode: string } | null;
+}
 
 export default function DocumentDetailPage({
   params,
@@ -37,19 +116,31 @@ export default function DocumentDetailPage({
   const router = useRouter();
   const { id: docId } = use(params);
 
-  const [docData, setDocData] = useState<any>(null);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [docData, setDocData] = useState<DocumentDetail | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [allowedActions, setAllowedActions] = useState<AllowedAction[]>([]);
-  const [activeTab, setActiveTab] = useState<"info" | "timeline" | "handlers" | "files">("info");
-  const [previewMode, setPreviewMode] = useState<"doc" | "pdf">("doc");
+  const [activeTab, setActiveTab] = useState<
+    "info" | "timeline" | "handlers" | "files"
+  >("info");
+  const [previewMode, setPreviewMode] = useState<"doc" | "pdf">("pdf");
   const [isLoading, setIsLoading] = useState(true);
 
   // Action states
-  const [selectedAction, setSelectedAction] = useState<AllowedAction | null>(null);
+  const [selectedAction, setSelectedAction] = useState<AllowedAction | null>(
+    null,
+  );
   const [actionReason, setActionReason] = useState("");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
+  const [canReport, setCanReport] = useState(false);
+  const [incomingAction, setIncomingAction] = useState<AllowedAction | null>(
+    null,
+  );
+  const [canAssign, setCanAssign] = useState(false);
+  const [canAttach, setCanAttach] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState("");
   // Drawer phân công
   const [isAssignDrawerOpen, setIsAssignDrawerOpen] = useState(false);
 
@@ -62,12 +153,15 @@ export default function DocumentDetailPage({
       setIsLoading(true);
       // Thử tải qua incoming trước, nếu 404 thì tải outgoing
       let res = await fetch(`/api/documents/incoming/${docId}`);
-      if (!res.ok) {
+      if (res.status === 404) {
         res = await fetch(`/api/documents/outgoing/${docId}`);
       }
       const json = await res.json();
       if (json.success) {
         setDocData(json.data.document);
+        setCanAssign(!!json.data.canAssign);
+        setCanAttach(!!json.data.canAttach);
+        setCanReport(!!json.data.canReport);
         setAuditLogs(json.data.auditLogs || []);
         setAllowedActions(json.data.allowedActions || []);
       } else {
@@ -81,10 +175,19 @@ export default function DocumentDetailPage({
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDocumentDetail();
   }, [docId]);
 
   function handleTriggerAction(action: AllowedAction) {
+    if (action.action === "DEPT_HEAD_ASSIGN") {
+      setIsAssignDrawerOpen(true);
+      return;
+    }
+    if (docData?.direction === "INCOMING") {
+      setIncomingAction(action);
+      return;
+    }
     setSelectedAction(action);
     setActionReason("");
     setIsConfirmOpen(true);
@@ -102,17 +205,20 @@ export default function DocumentDetailPage({
       setIsActionLoading(true);
 
       // Nếu là hành động ký duyệt của Lãnh đạo
-      if (selectedAction.action === "LEADER_APPROVE" && docData.direction === "OUTGOING") {
+      if (
+        selectedAction.action === "LEADER_APPROVE" &&
+        docData?.direction === "OUTGOING"
+      ) {
         const signRes = await fetch(`/api/documents/outgoing/${docId}/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
         const signJson = await signRes.json();
         if (!signRes.ok || !signJson.success) {
-          toast.error(signJson.error?.message || "Ký số phê duyệt thất bại.");
+          toast.error(signJson.error?.message || "Phê duyệt điện tử thất bại.");
           return;
         }
-        toast.success("Phê duyệt điện tử và ký số thành công!");
+        toast.success("Phê duyệt điện tử thành công!");
         setIsConfirmOpen(false);
         fetchDocumentDetail();
         return;
@@ -169,6 +275,32 @@ export default function DocumentDetailPage({
     }
   }
 
+  async function attachFile(file: File) {
+    setIsUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch(
+        `/api/documents/${docData?.direction === "INCOMING" ? "incoming" : "outgoing"}/${docId}/files`,
+        { method: "POST", body: form },
+      );
+      const json = await response.json();
+      if (!response.ok || !json.success)
+        throw new Error(json.error?.message || "Không thể đính kèm tệp.");
+      setSelectedFileId(json.data.id);
+      setPreviewMode("pdf");
+      setActiveTab("files");
+      toast.success("Đã đính kèm tệp gốc.");
+      await fetchDocumentDetail();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không thể tải tệp lên.",
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="h-[80vh] flex items-center justify-center text-slate-500 text-sm">
@@ -185,20 +317,29 @@ export default function DocumentDetailPage({
     );
   }
 
-  const primaryFile = docData.files?.[0];
+  const primaryFile =
+    docData.files?.find((file: { id: string }) => file.id === selectedFileId) ||
+    docData.files?.[0];
 
   return (
     <div className="flex flex-col h-[calc(100vh-6.5rem)] space-y-3">
       {/* Top Header Bar */}
       <div className="bg-white rounded border border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.back()}>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => router.back()}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                {docData.documentNumber || docData.originalCode || "Chưa cấp số"}
+                {docData.documentNumber ||
+                  docData.originalCode ||
+                  "Chưa cấp số"}
               </span>
               <DocumentStatusBadge status={docData.status} />
               <UrgencyBadge level={docData.urgency} />
@@ -213,7 +354,7 @@ export default function DocumentDetailPage({
         {/* Dynamic Action Buttons (Sinh từ State Machine) */}
         <div className="flex items-center gap-2">
           {/* Nút nộp báo cáo nếu là chuyên viên thụ lý */}
-          {docData.direction === "INCOMING" && docData.status === "PROCESSING" && (
+          {canReport && (
             <Button
               variant="outline"
               size="sm"
@@ -225,12 +366,22 @@ export default function DocumentDetailPage({
             </Button>
           )}
 
+          {canAssign &&
+            !allowedActions.some(
+              (act) => act.action === "DEPT_HEAD_ASSIGN",
+            ) && (
+              <Button size="sm" onClick={() => setIsAssignDrawerOpen(true)}>
+                Phân công xử lý
+              </Button>
+            )}
           {allowedActions.map((act) => (
             <Button
               key={act.action}
               size="sm"
               variant={
-                act.action.includes("REJECT") || act.action.includes("RETURN") || act.action === "CANCEL"
+                act.action.includes("REJECT") ||
+                act.action.includes("RETURN") ||
+                act.action === "CANCEL"
                   ? "danger"
                   : "primary"
               }
@@ -260,7 +411,7 @@ export default function DocumentDetailPage({
                 }`}
               >
                 <FileText className="h-3.5 w-3.5 text-indigo-600" />
-                Bản văn bản điện tử (A4)
+                Thông tin văn bản
               </button>
 
               <button
@@ -273,7 +424,7 @@ export default function DocumentDetailPage({
                 }`}
               >
                 <Paperclip className="h-3.5 w-3.5 text-indigo-600" />
-                Tệp đính kèm {primaryFile ? `(1)` : `(0)`}
+                Tệp đính kèm ({docData.files?.length || 0})
               </button>
             </div>
 
@@ -295,10 +446,10 @@ export default function DocumentDetailPage({
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 font-medium"
-                    title="Mở tab mới"
+                    title="Mở trong cửa sổ mới"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
-                    Mở tab mới
+                    Mở trong cửa sổ mới
                   </a>
                   <a
                     href={`/api/files/${primaryFile.id}`}
@@ -313,194 +464,116 @@ export default function DocumentDetailPage({
             </div>
           </div>
 
+          {previewMode === "pdf" && (
+            <div className="p-2 border-b flex flex-wrap items-center gap-2 text-sm">
+              {docData.files && docData.files.length > 0 && (
+                <select
+                  aria-label="Chọn tệp để xem"
+                  className="border rounded p-1 min-w-0 max-w-full"
+                  value={primaryFile?.id || ""}
+                  onChange={(e) => setSelectedFileId(e.target.value)}
+                >
+                  {docData.files.map(
+                    (file: { id: string; fileName: string }) => (
+                      <option key={file.id} value={file.id}>
+                        {file.fileName}
+                      </option>
+                    ),
+                  )}
+                </select>
+              )}
+              {canAttach && (
+                <label className="cursor-pointer text-indigo-700 font-semibold">
+                  {isUploading ? "Đang tải tệp lên…" : "Bổ sung tệp đính kèm"}
+                  <input
+                    aria-label="Bổ sung tệp đính kèm"
+                    type="file"
+                    className="sr-only"
+                    disabled={isUploading}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void attachFile(file);
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          )}
           {/* Vùng nội dung xem */}
           {previewMode === "doc" ? (
-            <div className="flex-1 bg-slate-200/80 p-3 sm:p-5 overflow-y-auto flex justify-center">
-              <div className="w-full max-w-[700px] bg-white shadow-md border border-slate-300 p-6 sm:p-9 text-slate-800 flex flex-col justify-between min-h-[780px] rounded-xs font-sans">
-                {/* Phần đầu: Quốc hiệu, Tiêu ngữ, Cơ quan / Người gửi */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-12 gap-2 border-b border-slate-200 pb-3">
-                    {/* Cột trái */}
-                    <div className="col-span-5 text-center sm:text-left space-y-0.5">
-                      {docData.direction === "INCOMING" &&
-                      (docData.originalCode?.startsWith("DTT") || docData.creator?.employeeCode === "CITIZEN") ? (
-                        <>
-                          <p className="font-sans text-[11px] font-bold text-slate-900 uppercase tracking-tight">
-                            CỔNG TIẾP NHẬN DỊCH VỤ CÔNG
-                          </p>
-                          <p className="font-sans text-[10px] text-slate-500 font-medium">
-                            TIẾP NHẬN ĐƠN THƯ ĐIỆN TỬ
-                          </p>
-                          <p className="font-sans text-[11px] font-semibold text-indigo-700 mt-1">
-                            Mã hồ sơ: {docData.originalCode || "DTT-2026-841"}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-sans text-[11px] font-bold text-slate-900 uppercase tracking-tight">
-                            {docData.senderOrg?.name || docData.draftUnit?.name || "CƠ QUAN BAN HÀNH"}
-                          </p>
-                          <p className="font-sans text-[11px] text-slate-700 font-medium">
-                            Số:{" "}
-                            {docData.documentNumber
-                              ? `${docData.documentNumber}/${docData.documentNumberYear}`
-                              : docData.originalCode || "---"}
-                          </p>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Cột phải: Quốc hiệu, tiêu ngữ */}
-                    <div className="col-span-7 text-center space-y-0.5">
-                      <p className="font-sans text-[11px] font-bold text-slate-900 uppercase">
-                        CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
-                      </p>
-                      <p className="font-sans text-[12px] font-bold text-slate-800">
-                        Độc lập - Tự do - Hạnh phúc
-                      </p>
-                      <div className="w-28 h-[1px] bg-slate-800 mx-auto mt-0.5" />
-                      <p className="font-sans italic text-[11px] text-slate-500 mt-1.5">
-                        {docData.issuedDate
-                          ? `Ngày ${new Date(docData.issuedDate).getDate()} tháng ${
-                              new Date(docData.issuedDate).getMonth() + 1
-                            } năm ${new Date(docData.issuedDate).getFullYear()}`
-                          : `Ngày ${new Date().getDate()} tháng ${
-                              new Date().getMonth() + 1
-                            } năm ${new Date().getFullYear()}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Tên loại văn bản & Trích yếu */}
-                  <div className="text-center py-2 space-y-1">
-                    <h2 className="font-sans text-base sm:text-lg font-bold text-slate-900 uppercase tracking-wide">
-                      {docData.docType?.name || docData.documentType?.name || "ĐƠN KIẾN NGHỊ / PHẢN ÁNH"}
-                    </h2>
-                    <p className="text-xs sm:text-sm font-semibold text-slate-700 max-w-lg mx-auto">
-                      V/v: {docData.title}
-                    </p>
-                  </div>
-
-                  {/* Kính gửi */}
-                  <div className="text-xs sm:text-sm space-y-1 pt-1">
-                    <p className="font-semibold text-slate-800">
-                      Kính gửi:{" "}
-                      <span className="font-normal italic">
-                        Ủy ban Nhân dân / Cơ quan tiếp nhận và giải quyết thủ tục hành chính
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Thông tin người nộp đơn / Chủ thể */}
-                  <div className="bg-slate-50 p-3 rounded border border-slate-200 text-xs font-sans space-y-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-slate-500 block text-[10px]">Chủ thể nộp / Người gửi:</span>
-                        <span className="font-bold text-slate-900">
-                          {docData.senderOrg?.name || docData.senderName || "Nguyễn Văn Dân"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[10px]">Số điện thoại liên hệ:</span>
-                        <span className="font-medium text-slate-800">
-                          {docData.senderOrg?.phone || "0912.345.678"}
-                        </span>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <span className="text-slate-500 block text-[10px]">Địa chỉ liên hệ:</span>
-                        <span className="text-slate-800">
-                          {docData.senderOrg?.address || "Toàn quốc"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Nội dung chi tiết */}
-                  <div className="space-y-2 pt-1 text-xs sm:text-sm leading-relaxed">
-                    <p className="font-sans font-bold text-slate-800 uppercase text-[11px]">
-                      Nội dung trình bày & Kiến nghị:
-                    </p>
-                    <div className="p-3 bg-white rounded border border-slate-200 text-slate-700 whitespace-pre-wrap leading-6 text-justify">
-                      {docData.summaryNotes ? (
-                        docData.summaryNotes
-                      ) : (
-                        <>
-                          Tôi xin kính gửi đến Cơ quan có thẩm quyền xem xét và giải quyết đối với nội dung sau:
-                          <br />
-                          <strong>Trích yếu văn bản:</strong> {docData.title}.
-                          <br />
-                          Kính đề nghị Quý cơ quan xem xét, tiếp nhận vào sổ và giao bộ phận chuyên môn kiểm tra, giải quyết theo đúng thẩm quyền và quy chế công tác văn thư điện tử.
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Bút phê chỉ đạo & Tiếp nhận */}
-                  <div className="mt-3 p-2.5 bg-amber-50/70 border border-amber-300 rounded font-sans text-xs space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-900 text-[11px] uppercase">
-                      <FileCheck className="h-3.5 w-3.5 text-amber-700" />
-                      Ghi nhận tiếp nhận hồ sơ & Bút phê
-                    </div>
-                    <p className="text-amber-800 text-[11px]">
-                      <strong>Văn thư:</strong> Đã tiếp nhận vào Sổ văn bản đến chung (
-                      {docData.documentBook?.name || "SVB-DEN"}). Mã hồ sơ:{" "}
-                      {docData.originalCode || "DTT-2026-841"}.
-                    </p>
-                    <p className="text-amber-800 text-[11px]">
-                      <strong>Hạn xử lý:</strong>{" "}
-                      {docData.processingDeadline
-                        ? new Date(docData.processingDeadline).toLocaleDateString("vi-VN")
-                        : "Trong vòng 07 ngày làm việc"}
-                      .
-                    </p>
-                  </div>
-                </div>
-
-                {/* Phần chân: Chữ ký số và Dấu xác thực */}
-                <div className="pt-6 border-t border-slate-200 mt-5 grid grid-cols-2 gap-4 font-sans text-xs">
-                  <div>
-                    <p className="font-bold text-slate-700 text-[11px] uppercase">Nơi nhận:</p>
-                    <ul className="text-[10px] text-slate-600 space-y-0.5 mt-1 list-disc list-inside">
-                      <li>Như trên;</li>
-                      <li>Bộ phận chuyên môn giải quyết;</li>
-                      <li>Lưu: VT, HS (Nghị định 30/2020/NĐ-CP).</li>
-                    </ul>
-                  </div>
-
-                  <div className="text-center space-y-2">
-                    <p className="font-bold text-slate-800 text-[11px] uppercase">
-                      {docData.direction === "INCOMING" ? "NGƯỜI LÀM ĐƠN / ĐẠI DIỆN" : "NGƯỜI KÝ PHÁT HÀNH"}
-                    </p>
-
-                    {/* Con dấu xác thực số */}
-                    <div className="inline-block p-2 bg-red-50 border-2 border-red-500 rounded-lg text-red-700 text-center shadow-xs">
-                      <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-600">
-                        <CheckCircle2 className="h-3 w-3" />
-                        KÝ SỐ ĐIỆN TỬ HỢP LỆ
-                      </div>
-                      <p className="font-bold text-xs mt-0.5 text-red-800">
-                        {docData.senderName || docData.signerName || "Nguyễn Văn Dân"}
-                      </p>
-                      <p className="text-[9px] text-red-600 mt-0.5 font-mono">
-                        {new Date(docData.issuedDate || Date.now()).toLocaleDateString("vi-VN")} - ĐÃ XÁC THỰC
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="p-6 space-y-4 overflow-auto text-sm">
+              <h2 className="text-lg font-semibold">Thông tin văn bản</h2>
+              <p>
+                <strong>Trích yếu:</strong> {docData.title}
+              </p>
+              <p>
+                <strong>Nơi gửi:</strong>{" "}
+                {docData.senderName || "Chưa ghi nhận"}
+              </p>
+              <p>
+                <strong>Số văn bản:</strong>{" "}
+                {docData.documentNumber || "Chưa vào sổ"}
+              </p>
+              <p>
+                <strong>Lãnh đạo nhận trình:</strong>{" "}
+                {docData.workflow?.leader?.fullName || "Chưa trình"}
+              </p>
+              <p>
+                <strong>Phòng ban xử lý:</strong>{" "}
+                {docData.workflow?.unit?.name || "Chưa phân phối"}
+              </p>
+              <p>
+                <strong>Trưởng phòng phụ trách:</strong>{" "}
+                {docData.workflow?.head?.fullName || "Chưa phân phối"}
+              </p>
+              {docData.workflow?.instruction && (
+                <p className="whitespace-pre-wrap">
+                  <strong>Ý kiến chỉ đạo:</strong>{" "}
+                  {docData.workflow.instruction}
+                </p>
+              )}
+              {docData.summaryNotes && (
+                <p className="whitespace-pre-wrap">
+                  <strong>Ghi chú:</strong> {docData.summaryNotes}
+                </p>
+              )}
+              {docData.workflow?.trackingCode && (
+                <p>
+                  <strong>Mã tra cứu:</strong> {docData.workflow.trackingCode}
+                </p>
+              )}
+              <p className="text-slate-500">
+                Nội dung gốc nằm trong các tệp đính kèm.
+              </p>
             </div>
           ) : (
             /* Tab PDF Viewer */
             <div className="flex-1 bg-slate-100 flex items-center justify-center p-2 overflow-hidden relative">
-              {primaryFile ? (
+              {primaryFile &&
+              (primaryFile.mimeType === "application/pdf" ||
+                primaryFile.mimeType?.startsWith("image/")) ? (
                 <iframe
                   src={`/api/files/${primaryFile.id}`}
                   className="w-full h-full border-0 rounded bg-white shadow-xs"
-                  title="PDF Viewer"
+                  title={primaryFile.fileName}
                 />
+              ) : primaryFile ? (
+                <div className="text-center text-sm space-y-3">
+                  <p>{primaryFile.fileName}</p>
+                  <p>Định dạng này cần mở bằng ứng dụng trên máy.</p>
+                  <a
+                    className="text-indigo-600 underline"
+                    href={`/api/files/${primaryFile.id}`}
+                    download={primaryFile.fileName}
+                  >
+                    Tải tệp gốc
+                  </a>
+                </div>
               ) : (
                 <div className="text-center text-slate-400 text-xs">
-                  Văn bản này hiện chưa đính kèm file tài liệu.
+                  Văn bản này hiện chưa đính kèm tệp tài liệu.
                 </div>
               )}
             </div>
@@ -549,7 +622,7 @@ export default function DocumentDetailPage({
                   : "border-transparent hover:text-slate-900"
               }`}
             >
-              File ({docData.files?.length || 0})
+              Tệp đính kèm ({docData.files?.length || 0})
             </button>
           </div>
 
@@ -562,19 +635,25 @@ export default function DocumentDetailPage({
                   <span className="font-bold text-slate-800 uppercase text-[11px] block">
                     Nội dung trích yếu
                   </span>
-                  <p className="text-slate-700 leading-relaxed font-medium">{docData.title}</p>
+                  <p className="text-slate-700 leading-relaxed font-medium">
+                    {docData.title}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-slate-600">
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Hình thức sổ</span>
+                    <span className="text-slate-400 block text-[10px]">
+                      Hình thức sổ
+                    </span>
                     <span className="font-semibold text-slate-800">
                       {docData.documentBook?.name || "Chưa vào sổ"}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Loại văn bản</span>
+                    <span className="text-slate-400 block text-[10px]">
+                      Loại văn bản
+                    </span>
                     <span className="font-semibold text-slate-800">
                       {docData.documentType?.name || "Khác"}
                     </span>
@@ -582,16 +661,23 @@ export default function DocumentDetailPage({
 
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      {docData.direction === "INCOMING" ? "Cơ quan gửi" : "Nơi nhận"}
+                      {docData.direction === "INCOMING"
+                        ? "Cơ quan gửi"
+                        : "Nơi nhận"}
                     </span>
                     <span className="font-semibold text-slate-800">
-                      {docData.senderOrg?.name || docData.senderName || docData.recipientsSummary || "Nội bộ"}
+                      {docData.senderOrg?.name ||
+                        docData.senderName ||
+                        docData.recipientsSummary ||
+                        "Nội bộ"}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      {docData.direction === "INCOMING" ? "Số/ký hiệu gốc" : "Người ký"}
+                      {docData.direction === "INCOMING"
+                        ? "Số/ký hiệu gốc"
+                        : "Người ký"}
                     </span>
                     <span className="font-semibold text-slate-800">
                       {docData.originalCode || docData.signerName || "Chưa có"}
@@ -599,19 +685,27 @@ export default function DocumentDetailPage({
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Ngày văn bản</span>
+                    <span className="text-slate-400 block text-[10px]">
+                      Ngày văn bản
+                    </span>
                     <span className="font-semibold text-slate-800">
                       {docData.issuedDate
-                        ? new Date(docData.issuedDate).toLocaleDateString("vi-VN")
+                        ? new Date(docData.issuedDate).toLocaleDateString(
+                            "vi-VN",
+                          )
                         : "Chưa ghi nhận"}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Hạn xử lý</span>
+                    <span className="text-slate-400 block text-[10px]">
+                      Hạn xử lý
+                    </span>
                     <span className="font-semibold text-slate-800">
                       {docData.processingDeadline
-                        ? new Date(docData.processingDeadline).toLocaleDateString("vi-VN")
+                        ? new Date(
+                            docData.processingDeadline,
+                          ).toLocaleDateString("vi-VN")
                         : "Không đặt hạn"}
                     </span>
                   </div>
@@ -619,7 +713,9 @@ export default function DocumentDetailPage({
 
                 {docData.summaryNotes && (
                   <div className="p-3 bg-amber-50/50 rounded border border-amber-200/60 text-amber-900">
-                    <span className="font-bold block text-[10px] text-amber-800 uppercase">Ghi chú</span>
+                    <span className="font-bold block text-[10px] text-amber-800 uppercase">
+                      Ghi chú
+                    </span>
                     <p className="mt-0.5">{docData.summaryNotes}</p>
                   </div>
                 )}
@@ -630,7 +726,7 @@ export default function DocumentDetailPage({
             {activeTab === "timeline" && (
               <div className="space-y-4">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block">
-                  Nhật ký kiểm toán bất biến (Append-Only)
+                  Lịch sử xử lý văn bản
                 </span>
 
                 <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
@@ -639,12 +735,16 @@ export default function DocumentDetailPage({
                       <div className="absolute -left-6 top-1 h-3 w-3 rounded-full bg-indigo-600 ring-4 ring-white" />
                       <div className="bg-slate-50 border border-slate-200/80 rounded p-2.5 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-800">{log.action}</span>
+                          <span className="font-bold text-slate-800">
+                            {actionLabel(log.action)}
+                          </span>
                           <span className="text-[10px] text-slate-400 font-mono">
                             {new Date(log.createdAt).toLocaleString("vi-VN")}
                           </span>
                         </div>
-                        <p className="text-slate-600">{log.reason || "Cập nhật dữ liệu"}</p>
+                        <p className="text-slate-600">
+                          {log.reason || "Cập nhật dữ liệu"}
+                        </p>
                         <span className="text-[10px] text-indigo-600 font-medium block">
                           Bởi: {log.actor?.fullName} ({log.actor?.employeeCode})
                         </span>
@@ -671,7 +771,7 @@ export default function DocumentDetailPage({
                         Chưa phân công cán bộ thụ lý
                       </p>
                     ) : (
-                      docData.handlers?.map((h: any) => (
+                      docData.handlers?.map((h) => (
                         <div
                           key={h.id}
                           className={`p-3 rounded border space-y-1.5 ${
@@ -683,17 +783,27 @@ export default function DocumentDetailPage({
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-slate-900 flex items-center gap-1.5">
                               {h.assignee.fullName}
-                              <Badge variant={h.role === "MAIN" ? "info" : "secondary"}>
-                                {h.role === "MAIN" ? "Chủ trì" : h.role === "COORDINATE" ? "Phối hợp" : "Để biết"}
+                              <Badge
+                                variant={
+                                  h.role === "MAIN" ? "info" : "secondary"
+                                }
+                              >
+                                {h.role === "MAIN"
+                                  ? "Chủ trì"
+                                  : h.role === "COORDINATE"
+                                    ? "Phối hợp"
+                                    : "Để biết"}
                               </Badge>
                             </span>
                             <span className="text-[10px] font-semibold text-slate-500 uppercase">
-                              {h.status}
+                              {processingLabels[h.status] || "Đang xử lý"}
                             </span>
                           </div>
 
                           {h.instruction && (
-                            <p className="text-slate-600 italic">"Ý kiến: {h.instruction}"</p>
+                            <p className="text-slate-600 italic">
+                              &quot;Ý kiến: {h.instruction as string}&quot;
+                            </p>
                           )}
 
                           {h.reportContent && (
@@ -713,18 +823,31 @@ export default function DocumentDetailPage({
                     <span className="font-bold text-slate-800 uppercase text-[11px] block">
                       Chuỗi duyệt nối tiếp
                     </span>
-                    {docData.approvals?.map((app: any) => (
-                      <div key={app.id} className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
+                    {docData.approvals?.map((app) => (
+                      <div
+                        key={app.id}
+                        className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1"
+                      >
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-800">
                             Bước {app.stepOrder}: {app.approver?.fullName}
                           </span>
-                          <Badge variant={app.status === "APPROVED" ? "success" : "warning"}>
-                            {app.status}
+                          <Badge
+                            variant={
+                              app.status === "APPROVED" ? "success" : "warning"
+                            }
+                          >
+                            {processingLabels[app.status] || "Chờ xử lý"}
                           </Badge>
                         </div>
-                        <span className="text-[10px] text-slate-500 block">Vai trò: {app.role}</span>
-                        {app.comment && <p className="text-slate-600 italic">"Ý kiến: {app.comment}"</p>}
+                        <span className="text-[10px] text-slate-500 block">
+                          Vai trò: {roleLabels[app.role] || "Người duyệt"}
+                        </span>
+                        {app.comment && (
+                          <p className="text-slate-600 italic">
+                            &quot;Ý kiến: {app.comment as string}&quot;
+                          </p>
+                        )}
                       </div>
                     ))}
                   </>
@@ -738,12 +861,23 @@ export default function DocumentDetailPage({
                 <span className="font-bold text-slate-800 uppercase text-[11px] block">
                   Lịch sử các phiên bản tài liệu
                 </span>
-                {docData.files?.map((f: any) => (
-                  <div key={f.id} className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
+                {!docData.files?.length && (
+                  <p>
+                    Chưa có tệp đính kèm. Sử dụng “Bổ sung tệp đính kèm” để tải
+                    tệp gốc lên.
+                  </p>
+                )}
+                {docData.files?.map((f) => (
+                  <div
+                    key={f.id}
+                    className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1"
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-900">{f.fileName}</span>
+                      <span className="font-semibold text-slate-900">
+                        {f.fileName}
+                      </span>
                       <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded">
-                        v{f.version}
+                        Phiên bản {f.version}
                       </span>
                     </div>
                     <span className="text-[10px] font-mono text-slate-400 block truncate">
@@ -751,7 +885,8 @@ export default function DocumentDetailPage({
                     </span>
                     <div className="flex items-center justify-between pt-1">
                       <span className="text-[10px] text-slate-500">
-                        {(f.fileSize / 1024).toFixed(1)} KB • {f.uploader?.fullName}
+                        {(f.fileSize / 1024).toFixed(1)} KB •{" "}
+                        {f.uploader?.fullName}
                       </span>
                       <a
                         href={`/api/files/${f.id}`}
@@ -759,7 +894,7 @@ export default function DocumentDetailPage({
                         rel="noreferrer"
                         className="text-indigo-600 hover:underline font-medium text-[11px]"
                       >
-                        Tải file
+                        Tải tệp
                       </a>
                     </div>
                   </div>
@@ -784,12 +919,42 @@ export default function DocumentDetailPage({
         }
         confirmText={selectedAction?.label || "Đồng ý"}
         variant={
-          selectedAction?.action.includes("REJECT") || selectedAction?.action.includes("RETURN") || selectedAction?.action === "CANCEL"
+          selectedAction?.action.includes("REJECT") ||
+          selectedAction?.action.includes("RETURN") ||
+          selectedAction?.action === "CANCEL"
             ? "danger"
             : "primary"
         }
-      />
+      >
+        {selectedAction?.requiresReason && (
+          <label className="block text-sm">
+            Lý do *
+            <textarea
+              className="w-full border rounded p-2"
+              value={actionReason}
+              onChange={(e) => setActionReason(e.target.value)}
+              maxLength={1000}
+            />
+          </label>
+        )}
+      </ConfirmDialog>
 
+      {incomingAction && (
+        <IncomingActionDrawer
+          action={incomingAction}
+          documentId={docId}
+          onClose={() => setIncomingAction(null)}
+          onSaved={fetchDocumentDetail}
+        />
+      )}
+      {isAssignDrawerOpen && (
+        <AssignmentDrawer
+          open={true}
+          onClose={() => setIsAssignDrawerOpen(false)}
+          documentId={docId}
+          onSaved={fetchDocumentDetail}
+        />
+      )}
       {/* Drawer: Nộp báo cáo kết quả */}
       <Drawer
         isOpen={isReportDrawerOpen}
@@ -813,7 +978,11 @@ export default function DocumentDetailPage({
           </div>
 
           <div className="pt-4 flex justify-end gap-2 border-t border-slate-200">
-            <Button variant="outline" type="button" onClick={() => setIsReportDrawerOpen(false)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setIsReportDrawerOpen(false)}
+            >
               Hủy
             </Button>
             <Button type="submit" isLoading={isActionLoading}>

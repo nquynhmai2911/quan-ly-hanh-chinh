@@ -3,6 +3,7 @@
 
 "use client";
 
+import { documentStatusLabels } from "@/lib/display-labels";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -21,9 +22,25 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+type MonthStat = { month: string; incoming: number; outgoing: number };
+type DeptStat = { unitName: string; code: string; total: number; onTimeRate: number };
+type DocTypeStat = { typeName: string; count: number; percent: number };
+type IncomingSample = { id: string; documentNumber: string; receivedDate: string | null; senderOrg?: { name: string } | null; senderName: string; originalCode: string | null; title: string; documentType?: { name: string } | null; urgency: string; handlers: Array<{ assignee?: { fullName: string } | null }>; processingDeadline: string | null; status: string };
+type OutgoingSample = { id: string; documentNumber: string | null; issuedDate: string | null; createdAt: string; draftUnit?: { name: string } | null; title: string; documentType?: { name: string } | null; urgency: string; signerName: string | null; recipientsSummary: string | null; status: string };
+interface ReportData {
+  summary: { avgOnTimeRate: number; totalCompleted: number; totalIncoming: number; totalOutgoing: number; totalOverdue: number };
+  monthlyStats: MonthStat[];
+  deptStats: DeptStat[];
+  docTypeStats: DocTypeStat[];
+  sampleIncoming: IncomingSample[];
+  sampleOutgoing: OutgoingSample[];
+}
+
 export default function ReportsPage() {
-  const [selectedYear, setSelectedYear] = useState("2026");
-  const [data, setData] = useState<any>(null);
+  const [selectedYear, setSelectedYear] = useState(
+    String(new Date().getFullYear()),
+  );
+  const [data, setData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   async function loadReport(year = selectedYear) {
@@ -42,12 +59,18 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadReport(selectedYear);
   }, [selectedYear]);
 
   function exportBook(bookType: "INCOMING" | "OUTGOING") {
-    window.open(`/api/reports/export-excel?bookType=${bookType}&year=${selectedYear}`, "_blank");
-    toast.success(`Đang xuất Sổ văn bản ${bookType === "INCOMING" ? "đến" : "đi"} năm ${selectedYear}...`);
+    window.open(
+      `/api/reports/export-excel?bookType=${bookType}&year=${selectedYear}`,
+      "_blank",
+    );
+    toast.success(
+      `Đang xuất Sổ văn bản ${bookType === "INCOMING" ? "đến" : "đi"} năm ${selectedYear}...`,
+    );
   }
 
   return (
@@ -60,7 +83,8 @@ export default function ReportsPage() {
             Báo cáo Thống kê & Sổ Văn bản Hành chính
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Tổng hợp dữ liệu luân chuyển, tỷ lệ xử lý đúng hạn và xuất/in sổ đăng ký văn bản theo Nghị định 30/2020/NĐ-CP
+            Tổng hợp dữ liệu luân chuyển, tỷ lệ xử lý đúng hạn và xuất/in sổ
+            đăng ký văn bản theo Nghị định 30/2020/NĐ-CP
           </p>
         </div>
 
@@ -75,15 +99,30 @@ export default function ReportsPage() {
             <option value="2024">Năm 2024</option>
           </select>
 
-          <Button variant="outline" size="sm" onClick={() => exportBook("INCOMING")} className="gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportBook("INCOMING")}
+            className="gap-1.5"
+          >
             <Download className="h-3.5 w-3.5" /> Xuất Sổ VB Đến
           </Button>
 
-          <Button variant="outline" size="sm" onClick={() => exportBook("OUTGOING")} className="gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportBook("OUTGOING")}
+            className="gap-1.5"
+          >
             <Download className="h-3.5 w-3.5" /> Xuất Sổ VB Đi
           </Button>
 
-          <Button variant="primary" size="sm" onClick={() => window.print()} className="gap-1.5">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => window.print()}
+            className="gap-1.5"
+          >
             <Printer className="h-3.5 w-3.5" /> In Báo cáo
           </Button>
         </div>
@@ -93,47 +132,73 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="bg-white rounded border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Tổng VB Đến</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">
+              Tổng VB Đến
+            </span>
             <Inbox className="h-4 w-4 text-indigo-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900 mt-2">{data?.summary?.totalIncoming || 0}</div>
+          <div className="text-2xl font-bold text-slate-900 mt-2">
+            {data?.summary?.totalIncoming || 0}
+          </div>
           <p className="text-[11px] text-slate-400 mt-1">Đã vào sổ tiếp nhận</p>
         </div>
 
         <div className="bg-white rounded border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Tổng VB Đi</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">
+              Tổng VB Đi
+            </span>
             <Send className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900 mt-2">{data?.summary?.totalOutgoing || 0}</div>
+          <div className="text-2xl font-bold text-slate-900 mt-2">
+            {data?.summary?.totalOutgoing || 0}
+          </div>
           <p className="text-[11px] text-slate-400 mt-1">Đã soạn & ban hành</p>
         </div>
 
         <div className="bg-white rounded border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Đã hoàn thành</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">
+              Đã hoàn thành
+            </span>
             <CheckCircle2 className="h-4 w-4 text-sky-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900 mt-2">{data?.summary?.totalCompleted || 0}</div>
-          <p className="text-[11px] text-slate-400 mt-1">Đạt kết quả nghiệm thu</p>
+          <div className="text-2xl font-bold text-slate-900 mt-2">
+            {data?.summary?.totalCompleted || 0}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Đạt kết quả nghiệm thu
+          </p>
         </div>
 
         <div className="bg-white rounded border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Tỷ lệ đúng hạn</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">
+              Tỷ lệ đúng hạn
+            </span>
             <FileCheck className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-bold text-emerald-600 mt-2">{data?.summary?.avgOnTimeRate || 95}%</div>
-          <p className="text-[11px] text-slate-400 mt-1">Chỉ tiêu cơ quan: ≥ 90%</p>
+          <div className="text-2xl font-bold text-emerald-600 mt-2">
+            {data?.summary?.avgOnTimeRate || 95}%
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Chỉ tiêu cơ quan: ≥ 90%
+          </p>
         </div>
 
         <div className="bg-white rounded border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Văn bản quá hạn</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">
+              Văn bản quá hạn
+            </span>
             <AlertTriangle className="h-4 w-4 text-rose-600" />
           </div>
-          <div className="text-2xl font-bold text-rose-600 mt-2">{data?.summary?.totalOverdue || 0}</div>
-          <p className="text-[11px] text-slate-400 mt-1">Cần đôn đốc xử lý gấp</p>
+          <div className="text-2xl font-bold text-rose-600 mt-2">
+            {data?.summary?.totalOverdue || 0}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Cần đôn đốc xử lý gấp
+          </p>
         </div>
       </div>
 
@@ -141,26 +206,38 @@ export default function ReportsPage() {
       <div className="bg-white rounded border border-slate-200 p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <span className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
-            <BarChart3 className="h-4 w-4 text-indigo-600" /> Biểu đồ số lượng văn bản luân chuyển 12 tháng năm {selectedYear}
+            <BarChart3 className="h-4 w-4 text-indigo-600" /> Biểu đồ số lượng
+            văn bản luân chuyển 12 tháng năm {selectedYear}
           </span>
           <div className="flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="h-3 w-3 rounded-xs bg-indigo-600 inline-block" /> VB Đến
+              <span className="h-3 w-3 rounded-xs bg-indigo-600 inline-block" />{" "}
+              VB Đến
             </span>
             <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="h-3 w-3 rounded-xs bg-emerald-500 inline-block" /> VB Đi
+              <span className="h-3 w-3 rounded-xs bg-emerald-500 inline-block" />{" "}
+              VB Đi
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-12 gap-2 h-48 items-end pt-4 pb-2 border-b border-slate-200">
-          {(data?.monthlyStats || []).map((m: any, idx: number) => {
+          {(data?.monthlyStats || []).map((m: MonthStat, idx: number) => {
             const maxVal = 100;
-            const incHeight = Math.min(100, Math.round((m.incoming / maxVal) * 100));
-            const outHeight = Math.min(100, Math.round((m.outgoing / maxVal) * 100));
+            const incHeight = Math.min(
+              100,
+              Math.round((m.incoming / maxVal) * 100),
+            );
+            const outHeight = Math.min(
+              100,
+              Math.round((m.outgoing / maxVal) * 100),
+            );
 
             return (
-              <div key={idx} className="flex flex-col items-center h-full justify-end group">
+              <div
+                key={idx}
+                className="flex flex-col items-center h-full justify-end group"
+              >
                 <div className="w-full flex items-end justify-center gap-1 h-36">
                   {/* Incoming bar */}
                   <div
@@ -182,7 +259,9 @@ export default function ReportsPage() {
                     </span>
                   </div>
                 </div>
-                <span className="text-[11px] font-semibold text-slate-500 mt-2">{m.month}</span>
+                <span className="text-[11px] font-semibold text-slate-500 mt-2">
+                  {m.month}
+                </span>
               </div>
             );
           })}
@@ -195,7 +274,8 @@ export default function ReportsPage() {
         <div className="lg:col-span-2 bg-white rounded border border-slate-200 p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <span className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
-              <Building2 className="h-4 w-4 text-indigo-600" /> Kết quả xử lý theo đơn vị / phòng ban
+              <Building2 className="h-4 w-4 text-indigo-600" /> Kết quả xử lý
+              theo đơn vị / phòng ban
             </span>
           </div>
 
@@ -210,12 +290,14 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(data?.deptStats || []).map((dept: any, i: number) => (
+                {(data?.deptStats || []).map((dept: DeptStat, i: number) => (
                   <tr key={i} className="hover:bg-slate-50/80">
                     <td className="px-3 py-2.5 font-medium text-slate-900">
                       {dept.unitName} ({dept.code})
                     </td>
-                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">{dept.total}</td>
+                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">
+                      {dept.total}
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="w-28 bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -224,13 +306,15 @@ export default function ReportsPage() {
                               dept.onTimeRate >= 95
                                 ? "bg-emerald-500"
                                 : dept.onTimeRate >= 90
-                                ? "bg-indigo-600"
-                                : "bg-amber-500"
+                                  ? "bg-indigo-600"
+                                  : "bg-amber-500"
                             }`}
                             style={{ width: `${dept.onTimeRate}%` }}
                           />
                         </div>
-                        <span className="font-bold text-[11px] text-slate-700">{dept.onTimeRate}%</span>
+                        <span className="font-bold text-[11px] text-slate-700">
+                          {dept.onTimeRate}%
+                        </span>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-right">
@@ -255,21 +339,28 @@ export default function ReportsPage() {
         <div className="bg-white rounded border border-slate-200 p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <span className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
-              <PieChart className="h-4 w-4 text-indigo-600" /> Cơ cấu loại văn bản
+              <PieChart className="h-4 w-4 text-indigo-600" /> Cơ cấu loại văn
+              bản
             </span>
           </div>
 
           <div className="space-y-3">
-            {(data?.docTypeStats || []).map((dt: any, i: number) => (
+            {(data?.docTypeStats || []).map((dt: DocTypeStat, i: number) => (
               <div key={i} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-slate-700">{dt.typeName}</span>
+                  <span className="font-medium text-slate-700">
+                    {dt.typeName}
+                  </span>
                   <span className="text-slate-500">
-                    <strong className="text-slate-900">{dt.count}</strong> ({dt.percent}%)
+                    <strong className="text-slate-900">{dt.count}</strong> (
+                    {dt.percent}%)
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${dt.percent}%` }} />
+                  <div
+                    className="h-full bg-indigo-600 rounded-full"
+                    style={{ width: `${dt.percent}%` }}
+                  />
                 </div>
               </div>
             ))}
@@ -277,7 +368,8 @@ export default function ReportsPage() {
 
           <div className="bg-slate-50 p-3 rounded border border-slate-200 text-xs text-slate-500 mt-4">
             <p>
-              * Số liệu trên được tổng hợp từ toàn bộ các sổ văn bản cơ quan đã đăng ký và ban hành trong năm {selectedYear}.
+              * Số liệu trên được tổng hợp từ toàn bộ các sổ văn bản cơ quan đã
+              đăng ký và ban hành trong năm {selectedYear}.
             </p>
           </div>
         </div>
@@ -294,7 +386,8 @@ export default function ReportsPage() {
               Sổ Đăng Ký Văn Bản Hành Chính (Mẫu 5 Văn Bản Đến & 5 Văn Bản Đi)
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Dữ liệu đối chiếu đồng bộ thời gian thực với phân hệ Văn bản đến và Văn bản đi theo Nghị định 30/2020/NĐ-CP
+              Dữ liệu đối chiếu đồng bộ thời gian thực với phân hệ Văn bản đến
+              và Văn bản đi theo Nghị định 30/2020/NĐ-CP
             </p>
           </div>
 
@@ -339,58 +432,73 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(data?.sampleIncoming || []).map((doc: any, idx: number) => {
-                  const handlerName = doc.handlers?.[0]?.assignee?.fullName || "Chưa phân công";
+                {(data?.sampleIncoming || []).map((doc: IncomingSample, idx: number) => {
+                  const handlerName =
+                    doc.handlers?.[0]?.assignee?.fullName || "Chưa phân công";
                   const deadlineStr = doc.processingDeadline
-                    ? new Date(doc.processingDeadline).toLocaleDateString("vi-VN")
+                    ? new Date(doc.processingDeadline).toLocaleDateString(
+                        "vi-VN",
+                      )
                     : "—";
 
                   return (
-                    <tr key={doc.id} className="hover:bg-indigo-50/40 transition-colors">
-                      <td className="px-3 py-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
+                    <tr
+                      key={doc.id}
+                      className="hover:bg-indigo-50/40 transition-colors"
+                    >
+                      <td className="px-3 py-2.5 text-center font-bold text-slate-500">
+                        {idx + 1}
+                      </td>
                       <td className="px-3 py-2.5">
                         <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-[11px]">
                           {doc.documentNumber}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-slate-600">
-                        {doc.receivedDate ? new Date(doc.receivedDate).toLocaleDateString("vi-VN") : "—"}
+                        {doc.receivedDate
+                          ? new Date(doc.receivedDate).toLocaleDateString(
+                              "vi-VN",
+                            )
+                          : "—"}
                       </td>
                       <td className="px-3 py-2.5 font-medium text-slate-900">
                         {doc.senderOrg?.name || doc.senderName}
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-slate-600">{doc.originalCode || "—"}</td>
+                      <td className="px-3 py-2.5 font-mono text-slate-600">
+                        {doc.originalCode || "—"}
+                      </td>
                       <td className="px-3 py-2.5 max-w-sm">
-                        <p className="font-semibold text-slate-900 line-clamp-1">{doc.title}</p>
+                        <p className="font-semibold text-slate-900 line-clamp-1">
+                          {doc.title}
+                        </p>
                         <span className="text-[10px] text-slate-400 mt-0.5 inline-block">
-                          Loại: {doc.docType?.name || "Công văn"} • {doc.urgency === "FIRE" ? "Hỏa tốc" : doc.urgency === "URGENT" ? "Khẩn" : "Thường"}
+                          Loại: {doc.documentType?.name || "Chưa ghi nhận"} •{" "}
+                          {doc.urgency === "FIRE"
+                            ? "Hỏa tốc"
+                            : doc.urgency === "URGENT"
+                              ? "Khẩn"
+                              : "Thường"}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-slate-800">
                         <span className="font-medium">{handlerName}</span>
                       </td>
-                      <td className="px-3 py-2.5 text-slate-600">{deadlineStr}</td>
+                      <td className="px-3 py-2.5 text-slate-600">
+                        {deadlineStr}
+                      </td>
                       <td className="px-3 py-2.5 text-center">
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-block ${
                             doc.status === "COMPLETED"
                               ? "bg-sky-50 text-sky-700 border-sky-200"
                               : doc.status === "PROCESSING"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : doc.status === "DISTRIBUTED"
-                              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                              : "bg-slate-100 text-slate-700 border-slate-300"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : doc.status === "DISTRIBUTED"
+                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-300"
                           }`}
                         >
-                          {doc.status === "COMPLETED"
-                            ? "Hoàn thành"
-                            : doc.status === "PROCESSING"
-                            ? "Đang xử lý"
-                            : doc.status === "DISTRIBUTED"
-                            ? "Đã bút phê"
-                            : doc.status === "PENDING_LEADER"
-                            ? "Chờ ý kiến LĐ"
-                            : "Đã vào sổ"}
+                          {documentStatusLabels[doc.status] || "Chưa ghi nhận"}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right">
@@ -442,16 +550,21 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(data?.sampleOutgoing || []).map((doc: any, idx: number) => {
+                {(data?.sampleOutgoing || []).map((doc: OutgoingSample, idx: number) => {
                   const dateStr = doc.issuedDate
                     ? new Date(doc.issuedDate).toLocaleDateString("vi-VN")
                     : doc.createdAt
-                    ? new Date(doc.createdAt).toLocaleDateString("vi-VN")
-                    : "—";
+                      ? new Date(doc.createdAt).toLocaleDateString("vi-VN")
+                      : "—";
 
                   return (
-                    <tr key={doc.id} className="hover:bg-emerald-50/40 transition-colors">
-                      <td className="px-3 py-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
+                    <tr
+                      key={doc.id}
+                      className="hover:bg-emerald-50/40 transition-colors"
+                    >
+                      <td className="px-3 py-2.5 text-center font-bold text-slate-500">
+                        {idx + 1}
+                      </td>
                       <td className="px-3 py-2.5">
                         <span className="font-mono font-bold text-slate-900 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-[11px]">
                           {doc.documentNumber || "Dự thảo"}
@@ -459,19 +572,28 @@ export default function ReportsPage() {
                       </td>
                       <td className="px-3 py-2.5 text-slate-600">{dateStr}</td>
                       <td className="px-3 py-2.5 font-medium text-slate-800">
-                        {doc.draftUnit?.name || "Phòng TCHC"}
+                        {doc.draftUnit?.name || "Chưa ghi nhận"}
                       </td>
                       <td className="px-3 py-2.5 max-w-sm">
-                        <p className="font-semibold text-slate-900 line-clamp-1">{doc.title}</p>
+                        <p className="font-semibold text-slate-900 line-clamp-1">
+                          {doc.title}
+                        </p>
                         <span className="text-[10px] text-slate-400 mt-0.5 inline-block">
-                          Loại: {doc.docType?.name || "Văn bản"} • {doc.urgency === "FIRE" ? "Hỏa tốc" : doc.urgency === "URGENT" ? "Khẩn" : "Thường"}
+                          Loại: {doc.documentType?.name || "Văn bản"} •{" "}
+                          {doc.urgency === "FIRE"
+                            ? "Hỏa tốc"
+                            : doc.urgency === "URGENT"
+                              ? "Khẩn"
+                              : "Thường"}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-slate-800">
-                        <span className="font-medium">{doc.signerName || doc.creator?.fullName || "Nguyễn Văn An"}</span>
+                        <span className="font-medium">
+                          {doc.signerName || "Chưa phê duyệt"}
+                        </span>
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 truncate max-w-xs">
-                        {doc.recipientsSummary || "Các đơn vị trực thuộc"}
+                        {doc.recipientsSummary || "Chưa ghi nhận"}
                       </td>
                       <td className="px-3 py-2.5 text-center">
                         <span
@@ -479,21 +601,13 @@ export default function ReportsPage() {
                             doc.status === "ISSUED"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : doc.status === "NUMBERED"
-                              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                              : doc.status === "PENDING_APPROVAL"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-slate-100 text-slate-700 border-slate-300"
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                : doc.status === "PENDING_APPROVAL"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-300"
                           }`}
                         >
-                          {doc.status === "ISSUED"
-                            ? "Đã ban hành"
-                            : doc.status === "NUMBERED"
-                            ? "Đã cấp số"
-                            : doc.status === "PENDING_APPROVAL"
-                            ? "Chờ ký duyệt"
-                            : doc.status === "PENDING_REVIEW"
-                            ? "Chờ duyệt sơ bộ"
-                            : "Dự thảo"}
+                          {documentStatusLabels[doc.status] || "Chưa ghi nhận"}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right">

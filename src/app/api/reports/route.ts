@@ -1,117 +1,126 @@
-// src/app/api/reports/route.ts
-// API Báo cáo Thống kê tổng hợp số liệu Văn bản hành chính theo tháng, phòng ban, loại văn bản
-
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guard";
+import { documentScope } from "@/modules/document/access";
 import { successResponse, errorResponse } from "@/lib/api-response";
-
+import { BusinessError } from "@/lib/errors";
 export async function GET(request: NextRequest) {
   try {
-    await requireAuth();
-    const { searchParams } = new URL(request.url);
-    const year = parseInt(searchParams.get("year") || "2026", 10);
-
-    let monthlyStats: any[] = [];
-    let deptStats: any[] = [];
-    let docTypeStats: any[] = [];
-
-    try {
-      // Thống kê thực tế từ DB nếu online
-      const currentYearStart = new Date(year, 0, 1);
-      const currentYearEnd = new Date(year, 11, 31, 23, 59, 59);
-
-      const docs = await prisma.document.findMany({
-        where: {
-          createdAt: { gte: currentYearStart, lte: currentYearEnd },
+    const ctx = await requireAuth();
+    const year = Number(
+      request.nextUrl.searchParams.get("year") || new Date().getFullYear(),
+    );
+    if (!Number.isInteger(year) || year < 1900 || year > 2200)
+      throw new BusinessError("VALIDATION_ERROR", "Năm báo cáo không hợp lệ.");
+    const docs = await prisma.document.findMany({
+      where: {
+        AND: [
+          await documentScope(ctx),
+          {
+            createdAt: {
+              gte: new Date(year, 0, 1),
+              lt: new Date(year + 1, 0, 1),
+            },
+          },
+        ],
+      },
+      include: {
+        documentType: true,
+        workflow: { include: { unit: true } },
+        draftUnit: true,
+        senderOrg: true,
+        handlers: {
+          where: { role: "MAIN" },
+          include: { assignee: { select: { fullName: true } } },
         },
-        select: {
-          direction: true,
-          status: true,
-          createdAt: true,
-          documentTypeId: true,
-          draftUnitId: true,
-          processingDeadline: true,
-        },
-      });
-
-      // Gom theo tháng
-      const months = Array.from({ length: 12 }, (_, i) => ({
-        month: `T${i + 1}`,
-        incoming: 0,
-        outgoing: 0,
-        completed: 0,
-        overdue: 0,
-      }));
-
-      for (const d of docs) {
-        const m = new Date(d.createdAt).getMonth();
-        if (d.direction === "INCOMING") months[m].incoming++;
-        else months[m].outgoing++;
-
-        if (d.status === "COMPLETED" || d.status === "ISSUED") months[m].completed++;
-        if (d.processingDeadline && new Date(d.processingDeadline) < new Date() && d.status !== "COMPLETED") {
-          months[m].overdue++;
-        }
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const completed = (d: (typeof docs)[number]) =>
+      ["COMPLETED", "ISSUED"].includes(d.status);
+    const overdue = (d: (typeof docs)[number]) =>
+      !!d.processingDeadline &&
+      !completed(d) &&
+      d.processingDeadline < new Date();
+    const onTime = (d: (typeof docs)[number]) =>
+      completed(d) &&
+      (!d.processingDeadline || d.updatedAt <= d.processingDeadline);
+    const monthlyStats = Array.from({ length: 12 }, (_, i) => ({
+      month: `T${i + 1}`,
+      incoming: 0,
+      outgoing: 0,
+      completed: 0,
+      overdue: 0,
+    }));
+    const departments = new Map<
+      string,
+      {
+        unitName: string;
+        code: string;
+        total: number;
+        completed: number;
+        onTime: number;
       }
-
-      monthlyStats = months;
-    } catch {
-      // Fallback demo data chuẩn
-      monthlyStats = [
-        { month: "T1", incoming: 45, outgoing: 32, completed: 68, overdue: 3 },
-        { month: "T2", incoming: 62, outgoing: 48, completed: 95, overdue: 2 },
-        { month: "T3", incoming: 58, outgoing: 41, completed: 88, overdue: 4 },
-        { month: "T4", incoming: 70, outgoing: 55, completed: 110, overdue: 1 },
-        { month: "T5", incoming: 65, outgoing: 50, completed: 102, overdue: 5 },
-        { month: "T6", incoming: 80, outgoing: 64, completed: 130, overdue: 2 },
-        { month: "T7", incoming: 54, outgoing: 38, completed: 82, overdue: 3 },
-        { month: "T8", incoming: 60, outgoing: 44, completed: 94, overdue: 1 },
-        { month: "T9", incoming: 75, outgoing: 58, completed: 120, overdue: 4 },
-        { month: "T10", incoming: 82, outgoing: 67, completed: 138, overdue: 2 },
-        { month: "T11", incoming: 68, outgoing: 52, completed: 108, overdue: 3 },
-        { month: "T12", incoming: 90, outgoing: 75, completed: 150, overdue: 2 },
-      ];
+    >();
+    const types = new Map<string, { typeName: string; count: number }>();
+    for (const d of docs) {
+      const m = monthlyStats[d.createdAt.getMonth()];
+      if (d.direction === "INCOMING") m.incoming++;
+      else m.outgoing++;
+      if (completed(d)) m.completed++;
+      if (overdue(d)) m.overdue++;
+      const unit = d.workflow?.unit || d.draftUnit;
+      if (unit) {
+        const row = departments.get(unit.id) || {
+          unitName: unit.name,
+          code: unit.code,
+          total: 0,
+          completed: 0,
+          onTime: 0,
+        };
+        row.total++;
+        if (completed(d)) row.completed++;
+        if (onTime(d)) row.onTime++;
+        departments.set(unit.id, row);
+      }
+      const type = types.get(d.documentTypeId) || {
+        typeName: d.documentType.name,
+        count: 0,
+      };
+      type.count++;
+      types.set(d.documentTypeId, type);
     }
-
-    deptStats = [
-      { unitName: "Văn phòng cơ quan", code: "VP", total: 184, onTimeRate: 98 },
-      { unitName: "Phòng Tổ chức - Hành chính", code: "TCHC", total: 142, onTimeRate: 95 },
-      { unitName: "Phòng Kế hoạch - Tài chính", code: "KHTC", total: 98, onTimeRate: 92 },
-      { unitName: "Phòng Nghiệp vụ chuyên môn", code: "NVCM", total: 115, onTimeRate: 94 },
-      { unitName: "Thanh tra cơ quan", code: "TT", total: 46, onTimeRate: 96 },
-    ];
-
-    docTypeStats = [
-      { typeName: "Công văn", count: 245, percent: 42 },
-      { typeName: "Quyết định", count: 120, percent: 21 },
-      { typeName: "Tờ trình", count: 85, percent: 15 },
-      { typeName: "Thông báo", count: 68, percent: 12 },
-      { typeName: "Kế hoạch", count: 40, percent: 7 },
-      { typeName: "Khác", count: 18, percent: 3 },
-    ];
-
-    const { DEMO_DOCUMENTS } = await import("@/lib/demo-data");
-    const sampleIncoming = DEMO_DOCUMENTS.filter((d) => d.documentType === "INCOMING").slice(0, 5);
-    const sampleOutgoing = DEMO_DOCUMENTS.filter((d) => d.documentType === "OUTGOING").slice(0, 5);
-
+    const incoming = docs.filter((d) => d.direction === "INCOMING"),
+      outgoing = docs.filter((d) => d.direction === "OUTGOING");
+    const completeCount = docs.filter(completed).length;
     return successResponse({
       year,
       summary: {
-        totalIncoming: 5, // Khớp với 5 văn bản đến mẫu hiện hành
-        totalOutgoing: 5, // Khớp với 5 văn bản đi mẫu hiện hành
-        totalCompleted: 2, // 1 VB đến đã hoàn thành (doc-demo-05) + 1 VB đi đã ban hành (doc-demo-03)
-        totalOverdue: 0,
-        avgOnTimeRate: 100,
-        // Dữ liệu luân chuyển toàn cơ quan cả năm
-        annualIncoming: monthlyStats.reduce((acc, m) => acc + m.incoming, 0),
-        annualOutgoing: monthlyStats.reduce((acc, m) => acc + m.outgoing, 0),
+        totalIncoming: incoming.length,
+        totalOutgoing: outgoing.length,
+        totalCompleted: completeCount,
+        totalOverdue: docs.filter(overdue).length,
+        avgOnTimeRate: completeCount
+          ? Math.round((docs.filter(onTime).length * 100) / completeCount)
+          : 0,
+        annualIncoming: incoming.length,
+        annualOutgoing: outgoing.length,
       },
       monthlyStats,
-      deptStats,
-      docTypeStats,
-      sampleIncoming,
-      sampleOutgoing,
+      deptStats: [...departments.values()].map((d) => ({
+        unitName: d.unitName,
+        code: d.code,
+        total: d.total,
+        onTimeRate: d.completed
+          ? Math.round((d.onTime * 100) / d.completed)
+          : 0,
+      })),
+      docTypeStats: [...types.values()].map((t) => ({
+        ...t,
+        percent: docs.length ? Math.round((t.count * 100) / docs.length) : 0,
+      })),
+      sampleIncoming: incoming.slice(0, 5),
+      sampleOutgoing: outgoing.slice(0, 5),
     });
   } catch (error) {
     return errorResponse(error);

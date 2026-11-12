@@ -17,6 +17,7 @@ interface ConfirmDialogProps {
   cancelText?: string;
   variant?: "danger" | "primary";
   isLoading?: boolean;
+  children?: React.ReactNode;
 }
 
 export function ConfirmDialog({
@@ -29,6 +30,7 @@ export function ConfirmDialog({
   cancelText = "Hủy bỏ",
   variant = "danger",
   isLoading = false,
+  children,
 }: ConfirmDialogProps) {
   // Lắng nghe phím ESC để đóng
   useEffect(() => {
@@ -56,7 +58,9 @@ export function ConfirmDialog({
         <div className="flex items-start gap-4">
           <div
             className={`p-2.5 rounded-full shrink-0 ${
-              variant === "danger" ? "bg-rose-100 text-rose-600" : "bg-indigo-100 text-indigo-600"
+              variant === "danger"
+                ? "bg-rose-100 text-rose-600"
+                : "bg-indigo-100 text-indigo-600"
             }`}
           >
             <AlertTriangle className="h-5 w-5" />
@@ -76,8 +80,14 @@ export function ConfirmDialog({
           </button>
         </div>
 
+        {children && <div className="mt-4">{children}</div>}
         <div className="flex justify-end gap-2.5 mt-6">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            disabled={isLoading}
+          >
             {cancelText}
           </Button>
           <Button

@@ -5,9 +5,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createOutgoingDraftSchema, CreateOutgoingDraftFormData } from "@/modules/document/schema";
+import {
+  createOutgoingDraftSchema,
+  CreateOutgoingDraftFormData,
+} from "@/modules/document/schema";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Send, UploadCloud, ArrowLeft, Building2, User } from "lucide-react";
@@ -15,12 +18,10 @@ import { Send, UploadCloud, ArrowLeft, Building2, User } from "lucide-react";
 export default function NewOutgoingDraftPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [units, setUnits] = useState<Array<{ id: string; name: string; code: string }>>([
-    { id: "unit-tchc", name: "Phòng Tổ chức - Hành chính", code: "TCHC" },
-    { id: "unit-vp", name: "Văn phòng cơ quan", code: "VP" },
-    { id: "unit-khtc", name: "Phòng Kế hoạch - Tài chính", code: "KHTC" },
-    { id: "unit-cq", name: "Cơ quan hành chính", code: "CQ" },
-  ]);
+  const [units, setUnits] = useState<
+    Array<{ id: string; name: string; code: string }>
+  >([]);
+  const [books, setBooks] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const {
@@ -29,9 +30,9 @@ export default function NewOutgoingDraftPage() {
     setValue,
     formState: { errors },
   } = useForm<CreateOutgoingDraftFormData>({
-    resolver: zodResolver(createOutgoingDraftSchema) as any,
+    resolver: zodResolver(createOutgoingDraftSchema) as unknown as Resolver<CreateOutgoingDraftFormData>,
     defaultValues: {
-      draftUnitId: "unit-tchc",
+      draftUnitId: "",
       documentTypeId: "CV",
       urgency: "NORMAL",
       security: "NORMAL",
@@ -40,22 +41,41 @@ export default function NewOutgoingDraftPage() {
   });
 
   useEffect(() => {
-    fetch("/api/admin/units")
+    fetch("/api/auth/me")
       .then((r) => r.json())
       .then((j) => {
-        if (j.success && j.data.length > 0) {
-          setUnits(j.data);
-          setValue("draftUnitId", j.data[0].id);
+        if (j.success && j.data.positions.length > 0) {
+          const ownUnits = j.data.positions.map(
+            (p: { unitId: string; unitName: string; unitCode: string }) => ({
+              id: p.unitId,
+              name: p.unitName,
+              code: p.unitCode,
+            }),
+          );
+          setUnits(ownUnits);
+          setValue("draftUnitId", ownUnits[0].id);
         }
       })
       .catch(() => {});
+    fetch("/api/admin/books")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          const outgoing = j.data.filter(
+            (b: { bookType: string }) => b.bookType === "OUTGOING",
+          );
+          setBooks(outgoing);
+          if (outgoing.length) setValue("documentBookId", outgoing[0].id);
+        }
+      })
+      .catch(() => toast.error("Không tải được sổ văn bản đi."));
   }, [setValue]);
 
   async function onSubmit(data: CreateOutgoingDraftFormData) {
     try {
       setIsLoading(true);
 
-      const fileIds: string[] = [];
+      const uploadIds: string[] = [];
 
       // 1. Upload file dự thảo nếu có
       if (selectedFile) {
@@ -70,7 +90,7 @@ export default function NewOutgoingDraftPage() {
           toast.error(uploadJson.error?.message || "Lỗi khi tải file dự thảo.");
           return;
         }
-        // Gắn fileId nếu có
+        uploadIds.push(uploadJson.data.uploadId);
       }
 
       // 2. Tạo dự thảo văn bản đi
@@ -79,7 +99,7 @@ export default function NewOutgoingDraftPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
-          fileIds,
+          uploadIds,
         }),
       });
 
@@ -106,9 +126,12 @@ export default function NewOutgoingDraftPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Soạn thảo Dự thảo Văn bản đi / Tờ trình</h1>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Soạn thảo Dự thảo Văn bản đi / Tờ trình
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Khởi tạo dự thảo, đính kèm file Word/PDF và thiết lập chuỗi duyệt nối tiếp
+            Khởi tạo dự thảo, đính kèm file Word/PDF và thiết lập chuỗi duyệt
+            nối tiếp
           </p>
         </div>
       </div>
@@ -122,7 +145,9 @@ export default function NewOutgoingDraftPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Loại văn bản *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Loại văn bản *
+              </label>
               <select
                 {...register("documentTypeId")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -137,7 +162,9 @@ export default function NewOutgoingDraftPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn vị chủ trì soạn thảo *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Đơn vị chủ trì soạn thảo *
+              </label>
               <select
                 {...register("draftUnitId")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -148,11 +175,34 @@ export default function NewOutgoingDraftPage() {
                   </option>
                 ))}
               </select>
-              {errors.draftUnitId && <p className="text-xs text-rose-500 mt-1">{errors.draftUnitId.message}</p>}
+              {errors.draftUnitId && (
+                <p className="text-xs text-rose-500 mt-1">
+                  {errors.draftUnitId.message}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Người ký dự kiến</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Sổ văn bản đi *
+              </label>
+              <select
+                {...register("documentBookId")}
+                required
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded"
+              >
+                <option value="">Chọn sổ văn bản đi</option>
+                {books.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Người ký dự kiến
+              </label>
               <input
                 type="text"
                 {...register("signerName")}
@@ -162,7 +212,9 @@ export default function NewOutgoingDraftPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Chức vụ người ký</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Chức vụ người ký
+              </label>
               <input
                 type="text"
                 {...register("signerPosition")}
@@ -172,7 +224,9 @@ export default function NewOutgoingDraftPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Độ khẩn</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Độ khẩn
+              </label>
               <select
                 {...register("urgency")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -184,7 +238,9 @@ export default function NewOutgoingDraftPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Độ mật</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Độ mật
+              </label>
               <select
                 {...register("security")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -197,7 +253,9 @@ export default function NewOutgoingDraftPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Nơi nhận (Tóm tắt)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Nơi nhận (Tóm tắt)
+              </label>
               <input
                 type="text"
                 {...register("recipientsSummary")}
@@ -208,7 +266,9 @@ export default function NewOutgoingDraftPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Trích yếu nội dung dự thảo *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Trích yếu nội dung dự thảo *
+            </label>
             <textarea
               rows={3}
               required
@@ -216,7 +276,11 @@ export default function NewOutgoingDraftPage() {
               placeholder="VD: V/v ban hành quy chế quản lý và sử dụng chữ ký số trong cơ quan..."
               className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
             />
-            {errors.title && <p className="text-xs text-rose-500 mt-1">{errors.title.message}</p>}
+            {errors.title && (
+              <p className="text-xs text-rose-500 mt-1">
+                {errors.title.message}
+              </p>
+            )}
           </div>
         </div>
 
@@ -235,13 +299,19 @@ export default function NewOutgoingDraftPage() {
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               className="hidden"
             />
-            <label htmlFor="draft-file" className="cursor-pointer flex flex-col items-center">
+            <label
+              htmlFor="draft-file"
+              className="cursor-pointer flex flex-col items-center"
+            >
               <UploadCloud className="h-8 w-8 text-slate-400 mb-2" />
               <span className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-                {selectedFile ? selectedFile.name : "Tải lên file dự thảo (Word / PDF)"}
+                {selectedFile
+                  ? selectedFile.name
+                  : "Tải lên file dự thảo (Word / PDF)"}
               </span>
               <span className="text-xs text-slate-500 mt-1">
-                Tự động kiểm tra định dạng và băm mã SHA-256 phục vụ đối soát phiên bản
+                Tự động kiểm tra định dạng và băm mã SHA-256 phục vụ đối soát
+                phiên bản
               </span>
               {selectedFile && (
                 <span className="text-xs text-emerald-600 font-medium mt-2 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
@@ -256,7 +326,12 @@ export default function NewOutgoingDraftPage() {
           <Button variant="outline" type="button" onClick={() => router.back()}>
             Hủy bỏ
           </Button>
-          <Button type="submit" isLoading={isLoading} className="gap-2">
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            disabled={!units.length || !books.length}
+            className="gap-2"
+          >
             <Send className="h-4 w-4" />
             Lưu dự thảo
           </Button>

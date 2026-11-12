@@ -83,10 +83,11 @@ export default function OutgoingDocumentsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchOutgoingDocs();
   }, [page, pageSize, search, statusFilter]);
 
-  const columns: ColumnDef<OutgoingItem, any>[] = [
+  const columns: ColumnDef<OutgoingItem, unknown>[] = [
     {
       accessorKey: "documentNumber",
       header: "Số / Ký hiệu",

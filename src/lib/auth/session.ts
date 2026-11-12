@@ -9,7 +9,8 @@ export const SESSION_COOKIE_NAME = "eoffice_session";
 const SESSION_EXPIRATION = "7d";
 
 function getSecretKey(): Uint8Array {
-  const secret = process.env.AUTH_SECRET || "fallback-secret-key-at-least-32-chars-long";
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("Chưa cấu hình khóa phiên đăng nhập.");
   return new TextEncoder().encode(secret);
 }
 
@@ -30,7 +31,9 @@ export async function signSession(user: SessionUser): Promise<string> {
 }
 
 /** Giải mã và xác thực token JWT */
-export async function verifySession(token: string): Promise<SessionUser | null> {
+export async function verifySession(
+  token: string,
+): Promise<SessionUser | null> {
   try {
     const secret = getSecretKey();
     const { payload } = await jwtVerify(token, secret);

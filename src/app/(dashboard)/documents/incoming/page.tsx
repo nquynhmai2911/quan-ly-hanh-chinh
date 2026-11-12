@@ -8,7 +8,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Badge, DocumentStatusBadge, UrgencyBadge, SecurityBadge } from "@/components/ui/badge";
+import {
+  Badge,
+  DocumentStatusBadge,
+  UrgencyBadge,
+  SecurityBadge,
+} from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { FileText, Plus, UserCheck, Eye, Clock } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +45,7 @@ interface IncomingItem {
 
 const STATUS_TABS: Array<{ label: string; value: DocumentStatus | "" }> = [
   { label: "Tất cả", value: "" },
+  { label: "Chờ tiếp nhận", value: "SUBMITTED" },
   { label: "Đã vào sổ", value: "RECEIVED" },
   { label: "Chờ xin ý kiến", value: "PENDING_LEADER" },
   { label: "Đã bút phê", value: "DISTRIBUTED" },
@@ -58,17 +64,17 @@ export default function IncomingDocumentsPage() {
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | "">("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Drawer Phân công nhanh
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<IncomingItem | null>(null);
-  const [specialists, setSpecialists] = useState<Array<{ id: string; fullName: string; employeeCode: string }>>([]);
-  const [assignForm, setAssignForm] = useState({
-    assigneeId: "",
-    role: "MAIN",
-    instruction: "",
-    deadline: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canCreate, setCanCreate] = useState(false);
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success)
+          setCanCreate(
+            j.data.roles.some((r: string) => ["ADMIN", "CLERK"].includes(r)),
+          );
+      });
+  }, []);
 
   async function fetchIncomingDocs() {
     try {
@@ -85,7 +91,9 @@ export default function IncomingDocumentsPage() {
         setData(json.data);
         setTotal(json.pagination?.total || 0);
       } else {
-        toast.error(json.error?.message || "Không thể tải danh sách văn bản đến.");
+        toast.error(
+          json.error?.message || "Không thể tải danh sách văn bản đến.",
+        );
       }
     } catch {
       toast.error("Lỗi khi tải dữ liệu văn bản đến.");
@@ -95,61 +103,11 @@ export default function IncomingDocumentsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchIncomingDocs();
   }, [page, pageSize, search, statusFilter]);
 
-  async function openAssignDrawer(doc: IncomingItem) {
-    setSelectedDoc(doc);
-    setIsAssignOpen(true);
-    try {
-      const res = await fetch("/api/admin/users?pageSize=100");
-      const json = await res.json();
-      if (json.success && json.data.length > 0) {
-        setSpecialists(json.data);
-        setAssignForm((prev) => ({ ...prev, assigneeId: json.data[0].id }));
-      }
-    } catch {
-      toast.error("Không thể tải danh sách cán bộ.");
-    }
-  }
-
-  async function handleAssignSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedDoc) return;
-    try {
-      setIsSubmitting(true);
-      const res = await fetch(`/api/documents/incoming/${selectedDoc.id}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          handlers: [
-            {
-              assigneeId: assignForm.assigneeId,
-              role: assignForm.role,
-              instruction: assignForm.instruction,
-              deadline: assignForm.deadline ? new Date(assignForm.deadline) : undefined,
-            },
-          ],
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        toast.error(json.error?.message || "Phân công thất bại.");
-        return;
-      }
-
-      toast.success("Đã phân công chuyên viên thụ lý thành công!");
-      setIsAssignOpen(false);
-      fetchIncomingDocs();
-    } catch {
-      toast.error("Lỗi khi gửi phân công.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  const columns: ColumnDef<IncomingItem, any>[] = [
+  const columns: ColumnDef<IncomingItem, unknown>[] = [
     {
       accessorKey: "documentNumber",
       header: "Số đến",
@@ -191,7 +149,10 @@ export default function IncomingDocumentsPage() {
             {row.original.processingDeadline && (
               <span className="text-[10px] text-amber-600 flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded">
                 <Clock className="h-3 w-3" />
-                Hạn: {new Date(row.original.processingDeadline).toLocaleDateString("vi-VN")}
+                Hạn:{" "}
+                {new Date(row.original.processingDeadline).toLocaleDateString(
+                  "vi-VN",
+                )}
               </span>
             )}
           </div>
@@ -208,11 +169,18 @@ export default function IncomingDocumentsPage() {
       header: "Người chủ trì",
       cell: ({ row }) => {
         const main = row.original.handlers?.[0];
-        if (!main) return <span className="text-slate-400 italic text-xs">Chưa giao</span>;
+        if (!main)
+          return (
+            <span className="text-slate-400 italic text-xs">Chưa giao</span>
+          );
         return (
           <div className="text-xs">
-            <span className="font-medium text-slate-800">{main.assignee?.fullName || "Chưa phân công"}</span>
-            <span className="text-[10px] text-slate-400 block uppercase">{main.status}</span>
+            <span className="font-medium text-slate-800">
+              {main.assignee?.fullName || "Chưa phân công"}
+            </span>
+            <span className="text-[10px] text-slate-400 block uppercase">
+              {main.status}
+            </span>
           </div>
         );
       },
@@ -221,7 +189,10 @@ export default function IncomingDocumentsPage() {
       id: "actions",
       header: "Thao tác",
       cell: ({ row }) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Button
             variant="outline"
             size="sm"
@@ -231,17 +202,6 @@ export default function IncomingDocumentsPage() {
             <Eye className="h-3.5 w-3.5 mr-1 text-slate-500" />
             Chi tiết
           </Button>
-          {(row.original.status === "DISTRIBUTED" || row.original.status === "RECEIVED") && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => openAssignDrawer(row.original)}
-            >
-              <UserCheck className="h-3.5 w-3.5 mr-1 text-indigo-600" />
-              Giao việc
-            </Button>
-          )}
         </div>
       ),
     },
@@ -252,17 +212,22 @@ export default function IncomingDocumentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Văn bản đến</h1>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Văn bản đến
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quản lý tiếp nhận, vào sổ, trình bút phê và phân công xử lý văn bản đến
+            Quản lý tiếp nhận, vào sổ, trình bút phê và phân công xử lý văn bản
+            đến
           </p>
         </div>
-        <Link href="/documents/incoming/new">
-          <Button className="gap-1.5 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Vào sổ văn bản đến mới
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/documents/incoming/new">
+            <Button className="gap-1.5 shadow-sm">
+              <Plus className="h-4 w-4" />
+              Vào sổ văn bản đến mới
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Status Filter Tabs */}
@@ -302,68 +267,6 @@ export default function IncomingDocumentsPage() {
         onRowClick={(row) => router.push(`/documents/${row.id}`)}
         searchPlaceholder="Tìm theo số đến, ký hiệu gốc, trích yếu, nơi gửi..."
       />
-
-      {/* Drawer: Phân công nhanh */}
-      <Drawer
-        isOpen={isAssignOpen}
-        onClose={() => setIsAssignOpen(false)}
-        title="Phân công thụ lý văn bản đến"
-        description={selectedDoc?.title}
-      >
-        <form onSubmit={handleAssignSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Chuyên viên thụ lý (Chủ trì MAIN) *
-            </label>
-            <select
-              required
-              value={assignForm.assigneeId}
-              onChange={(e) => setAssignForm({ ...assignForm, assigneeId: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-            >
-              {specialists.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.fullName} ({s.employeeCode})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Hạn xử lý giao cho chuyên viên
-            </label>
-            <input
-              type="date"
-              value={assignForm.deadline}
-              onChange={(e) => setAssignForm({ ...assignForm, deadline: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Ý kiến chỉ đạo / Yêu cầu cụ thể
-            </label>
-            <textarea
-              rows={4}
-              value={assignForm.instruction}
-              onChange={(e) => setAssignForm({ ...assignForm, instruction: e.target.value })}
-              placeholder="VD: Nghiên cứu kỹ nội dung văn bản, chuẩn bị dự thảo trả lời trước ngày 15..."
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
-            />
-          </div>
-
-          <div className="pt-4 flex justify-end gap-2 border-t border-slate-200">
-            <Button variant="outline" type="button" onClick={() => setIsAssignOpen(false)}>
-              Hủy
-            </Button>
-            <Button type="submit" isLoading={isSubmitting}>
-              Xác nhận phân công
-            </Button>
-          </div>
-        </form>
-      </Drawer>
     </div>
   );
 }

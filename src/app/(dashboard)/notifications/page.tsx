@@ -21,8 +21,18 @@ import {
   Send,
 } from "lucide-react";
 
+interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  isRead: boolean;
+  link: string;
+  createdAt: string;
+}
+
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentTab, setCurrentTab] = useState("ALL");
   const [isLoading, setIsLoading] = useState(true);
@@ -44,6 +54,7 @@ export default function NotificationsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNotifications(currentTab);
   }, [currentTab]);
 

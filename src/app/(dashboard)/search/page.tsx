@@ -22,6 +22,24 @@ import {
   Send,
 } from "lucide-react";
 
+import type { DocumentStatus, UrgencyLevel } from "@prisma/client";
+interface SearchResult {
+  id: string;
+  direction: string;
+  documentType?: { id: string; name: string; code: string } | null;
+  documentNumber: string | null;
+  originalCode: string | null;
+  title: string;
+  urgency: UrgencyLevel;
+  status: DocumentStatus;
+  senderOrg?: { name: string } | null;
+  senderName?: string | null;
+  draftUnit?: { name: string } | null;
+  receivedDate: string | null;
+  issuedDate: string | null;
+  createdAt: string;
+}
+
 export default function SearchPage() {
   const [q, setQ] = useState("");
   const [direction, setDirection] = useState("");
@@ -30,7 +48,7 @@ export default function SearchPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
@@ -68,6 +86,7 @@ export default function SearchPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleSearch(false);
   }, [page]);
 
@@ -259,7 +278,7 @@ export default function SearchPage() {
                 {results.map((doc) => (
                   <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-4 py-3">
-                      {doc.direction === "INCOMING" || doc.documentType === "INCOMING" ? (
+                      {doc.direction === "INCOMING" ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                           <Inbox className="h-3 w-3" /> Đến
                         </span>

@@ -7,10 +7,21 @@ import { DocumentStatus, UrgencyLevel, SecurityLevel } from "@prisma/client";
 import { Flame, ShieldAlert } from "lucide-react";
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: "default" | "secondary" | "success" | "warning" | "danger" | "info" | "outline";
+  variant?:
+    | "default"
+    | "secondary"
+    | "success"
+    | "warning"
+    | "danger"
+    | "info"
+    | "outline";
 }
 
-export function Badge({ className, variant = "default", ...props }: BadgeProps) {
+export function Badge({
+  className,
+  variant = "default",
+  ...props
+}: BadgeProps) {
   const variants = {
     default: "bg-slate-100 text-slate-800 border-slate-200",
     secondary: "bg-slate-200 text-slate-700 border-slate-300",
@@ -26,7 +37,7 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
       className={cn(
         "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border select-none",
         variants[variant],
-        className
+        className,
       )}
       {...props}
     />
@@ -34,31 +45,87 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
 }
 
 /** Tên tiếng Việt và kiểu dáng trạng thái văn bản */
-const STATUS_CONFIG: Record<DocumentStatus, { label: string; className: string }> = {
-  DRAFT: { label: "Dự thảo", className: "bg-slate-100 text-slate-700 border-slate-200" },
-  RECEIVED: { label: "Đã vào sổ", className: "bg-sky-50 text-sky-700 border-sky-200" },
-  PENDING_LEADER: { label: "Chờ xin ý kiến", className: "bg-purple-50 text-purple-700 border-purple-200" },
-  DISTRIBUTED: { label: "Đã bút phê", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  PROCESSING: { label: "Đang xử lý", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  PENDING_REVIEW: { label: "Chờ duyệt", className: "bg-blue-50 text-blue-700 border-blue-200" },
-  PENDING_APPROVAL: { label: "Chờ ký duyệt", className: "bg-violet-50 text-violet-700 border-violet-200" },
-  APPROVED: { label: "Đã ký duyệt", className: "bg-teal-50 text-teal-700 border-teal-200" },
-  NUMBERED: { label: "Đã cấp số", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  ISSUED: { label: "Đã ban hành", className: "bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold" },
-  COMPLETED: { label: "Hoàn thành", className: "bg-green-100 text-green-800 border-green-300 font-semibold" },
-  RETURNED: { label: "Bị trả lại", className: "bg-orange-50 text-orange-700 border-orange-200" },
-  RECALLED: { label: "Đã thu hồi", className: "bg-rose-50 text-rose-700 border-rose-200 font-semibold" },
-  REPLACED: { label: "Bị thay thế", className: "bg-zinc-100 text-zinc-700 border-zinc-200 line-through" },
-  CANCELLED: { label: "Đã hủy", className: "bg-red-50 text-red-700 border-red-200 line-through" },
+const STATUS_CONFIG: Record<
+  DocumentStatus,
+  { label: string; className: string }
+> = {
+  DRAFT: {
+    label: "Dự thảo",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  SUBMITTED: {
+    label: "Chờ tiếp nhận",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  RECEIVED: {
+    label: "Đã vào sổ",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  PENDING_LEADER: {
+    label: "Chờ xin ý kiến",
+    className: "bg-purple-50 text-purple-700 border-purple-200",
+  },
+  DISTRIBUTED: {
+    label: "Đã bút phê",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  PROCESSING: {
+    label: "Đang xử lý",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  PENDING_REVIEW: {
+    label: "Chờ duyệt",
+    className: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  PENDING_APPROVAL: {
+    label: "Chờ ký duyệt",
+    className: "bg-violet-50 text-violet-700 border-violet-200",
+  },
+  APPROVED: {
+    label: "Đã ký duyệt",
+    className: "bg-teal-50 text-teal-700 border-teal-200",
+  },
+  NUMBERED: {
+    label: "Đã cấp số",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  ISSUED: {
+    label: "Đã ban hành",
+    className:
+      "bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold",
+  },
+  COMPLETED: {
+    label: "Hoàn thành",
+    className: "bg-green-100 text-green-800 border-green-300 font-semibold",
+  },
+  RETURNED: {
+    label: "Bị trả lại",
+    className: "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  RECALLED: {
+    label: "Đã thu hồi",
+    className: "bg-rose-50 text-rose-700 border-rose-200 font-semibold",
+  },
+  REPLACED: {
+    label: "Bị thay thế",
+    className: "bg-zinc-100 text-zinc-700 border-zinc-200 line-through",
+  },
+  CANCELLED: {
+    label: "Đã hủy",
+    className: "bg-red-50 text-red-700 border-red-200 line-through",
+  },
 };
 
 export function DocumentStatusBadge({ status }: { status: DocumentStatus }) {
-  const config = STATUS_CONFIG[status] || { label: status, className: "bg-slate-100 text-slate-700" };
+  const config = STATUS_CONFIG[status] || {
+    label: status,
+    className: "bg-slate-100 text-slate-700",
+  };
   return (
     <span
       className={cn(
         "inline-flex items-center rounded px-2 py-0.5 text-xs font-medium border select-none",
-        config.className
+        config.className,
       )}
     >
       {config.label}

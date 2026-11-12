@@ -23,13 +23,7 @@ export async function GET() {
 
     return successResponse(units);
   } catch (error) {
-    console.warn("[AdminUnits] Database offline, returning demo units:", (error as Error).message);
-    return successResponse([
-      { id: "unit-cq", name: "Cơ quan hành chính", code: "CQ", parentId: null, sortOrder: 1, isActive: true, _count: { positions: 5 } },
-      { id: "unit-vp", name: "Văn phòng cơ quan", code: "VP", parentId: "unit-cq", sortOrder: 2, isActive: true, _count: { positions: 3 } },
-      { id: "unit-tchc", name: "Phòng Tổ chức - Hành chính", code: "TCHC", parentId: "unit-cq", sortOrder: 3, isActive: true, _count: { positions: 4 } },
-      { id: "unit-khtc", name: "Phòng Kế hoạch - Tài chính", code: "KHTC", parentId: "unit-cq", sortOrder: 4, isActive: true, _count: { positions: 2 } },
-    ]);
+    return errorResponse(error);
   }
 }
 
@@ -41,7 +35,10 @@ export async function POST(request: NextRequest) {
     const parsed = unitSchema.safeParse(body);
 
     if (!parsed.success) {
-      throw new BusinessError("VALIDATION_ERROR", parsed.error.issues[0]?.message);
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        parsed.error.issues[0]?.message,
+      );
     }
 
     const { name, code, parentId, sortOrder, isActive } = parsed.data;
@@ -51,7 +48,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (existing) {
-      throw new BusinessError("CONFLICT", `Ký hiệu đơn vị '${code}' đã tồn tại.`);
+      throw new BusinessError(
+        "CONFLICT",
+        `Ký hiệu đơn vị '${code}' đã tồn tại.`,
+      );
     }
 
     let level = 0;

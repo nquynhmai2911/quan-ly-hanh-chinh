@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { DataScope } from "@prisma/client";
 import { ActivePosition, AuthContext } from "@/types/auth";
 import { AUTH_CONTEXT_CACHE_TTL } from "@/lib/constants";
-import { DEMO_USERS, getDemoAuthContext } from "@/lib/demo-data";
 
 // ── In-Memory Cache (TTL: 60s) ─────────────────────────────────────────────
 interface CacheEntry {
@@ -35,7 +34,9 @@ const SCOPE_WEIGHT: Record<DataScope, number> = {
 /**
  * Tải Auth Context đầy đủ của người dùng (Chức danh, Đơn vị, Vai trò, Quyền, Data Scope)
  */
-export async function getAuthContext(userId: string): Promise<AuthContext | null> {
+export async function getAuthContext(
+  userId: string,
+): Promise<AuthContext | null> {
   const now = Date.now();
   const cached = authContextCache.get(userId);
 
@@ -43,31 +44,26 @@ export async function getAuthContext(userId: string): Promise<AuthContext | null
     return cached.data;
   }
 
-  // Kiểm tra tài khoản DEMO trước nếu id thuộc demo
-  const demoUser = Object.values(DEMO_USERS).find(
-    (u) => u.id === userId || u.employeeCode === userId || u.email === userId
-  );
-
-  let user: any = null;
-  try {
-    user = await prisma.user.findUnique({
-      where: { id: userId, isActive: true },
-      include: {
-        positions: {
-          where: {
-            OR: [{ endedAt: null }, { endedAt: { gt: new Date() } }],
-          },
-          include: {
-            unit: true,
-            position: true,
-            roles: {
-              include: {
-                role: {
-                  include: {
-                    permissions: {
-                      include: {
-                        permission: true,
-                      },
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isActive: true },
+    include: {
+      positions: {
+        where: {
+          startedAt: { lte: new Date() },
+          OR: [{ endedAt: null }, { endedAt: { gt: new Date() } }],
+          unit: { isActive: true },
+          position: { isActive: true },
+        },
+        include: {
+          unit: true,
+          position: true,
+          roles: {
+            include: {
+              role: {
+                include: {
+                  permissions: {
+                    include: {
+                      permission: true,
                     },
                   },
                 },
@@ -76,59 +72,14 @@ export async function getAuthContext(userId: string): Promise<AuthContext | null
           },
         },
       },
-    });
-  } catch (dbErr) {
-    console.warn("[AuthContext] Database offline, using DEMO context for userId:", userId);
-  }
-
-  // Fallback demo context
-  if (!user && demoUser) {
-    const demoCtx = getDemoAuthContext(demoUser);
-    const authContext: AuthContext = {
-      userId: demoUser.id,
-      employeeCode: demoUser.employeeCode,
-      fullName: demoUser.fullName,
-      email: demoUser.email,
-      avatarUrl: null,
-      isActive: true,
-      positions: [
-        {
-          userPositionId: `pos-${demoUser.id}`,
-          positionId: `pos-${demoUser.id}`,
-          positionName: demoUser.positionName,
-          unitId: `unit-${demoUser.unitCode.toLowerCase()}`,
-          unitCode: demoUser.unitCode,
-          unitName: demoUser.unitName,
-          isPrimary: true,
-        },
-      ],
-      primaryPosition: {
-        userPositionId: `pos-${demoUser.id}`,
-        positionId: `pos-${demoUser.id}`,
-        positionName: demoUser.positionName,
-        unitId: `unit-${demoUser.unitCode.toLowerCase()}`,
-        unitCode: demoUser.unitCode,
-        unitName: demoUser.unitName,
-        isPrimary: true,
-      },
-      permissions: new Map(demoCtx.permissions.map((p: string) => [p, demoUser.dataScope])),
-      roleCodes: demoCtx.roleCodes,
-    };
-
-    authContextCache.set(userId, {
-      data: authContext,
-      expiresAt: now + AUTH_CONTEXT_CACHE_TTL * 1000,
-    });
-
-    return authContext;
-  }
-
+    },
+  });
   if (!user) {
     return null;
   }
 
   // 1. Danh sách chức vụ đang hoạt động
-  const activePositions: ActivePosition[] = user.positions.map((up: any) => ({
+  const activePositions: ActivePosition[] = user.positions.map((up) => ({
     userPositionId: up.id,
     unitId: up.unitId,
     unitCode: up.unit.code,
@@ -138,7 +89,8 @@ export async function getAuthContext(userId: string): Promise<AuthContext | null
     isPrimary: up.isPrimary,
   }));
 
-  const primaryPosition = activePositions.find((p) => p.isPrimary) || activePositions[0] || null;
+  const primaryPosition =
+    activePositions.find((p) => p.isPrimary) || activePositions[0] || null;
 
   // 2. Gom quyền và tính Data Scope cao nhất cho từng quyền
   const permissionsMap = new Map<string, DataScope>();
@@ -155,7 +107,10 @@ export async function getAuthContext(userId: string): Promise<AuthContext | null
         const permCode = rp.permission.code;
         const currentScope = permissionsMap.get(permCode);
 
-        if (!currentScope || SCOPE_WEIGHT[roleScope] > SCOPE_WEIGHT[currentScope]) {
+        if (
+          !currentScope ||
+          SCOPE_WEIGHT[roleScope] > SCOPE_WEIGHT[currentScope]
+        ) {
           permissionsMap.set(permCode, roleScope);
         }
       }

@@ -14,12 +14,18 @@ import { DataScope } from "@prisma/client";
 export async function requireAuth(): Promise<AuthContext> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new BusinessError("UNAUTHORIZED", "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.");
+    throw new BusinessError(
+      "UNAUTHORIZED",
+      "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.",
+    );
   }
 
   const ctx = await getAuthContext(user.id);
   if (!ctx || !ctx.isActive) {
-    throw new BusinessError("FORBIDDEN", "Tài khoản của bạn đã bị khóa hoặc không có quyền truy cập.");
+    throw new BusinessError(
+      "FORBIDDEN",
+      "Tài khoản của bạn đã bị khóa hoặc không có quyền truy cập.",
+    );
   }
 
   return ctx;
@@ -28,7 +34,9 @@ export async function requireAuth(): Promise<AuthContext> {
 /**
  * Yêu cầu người dùng phải có quyền hạn (Permission code) cụ thể
  */
-export async function requirePermission(permissionCode: string): Promise<AuthContext> {
+export async function requirePermission(
+  permissionCode: string,
+): Promise<AuthContext> {
   const ctx = await requireAuth();
 
   // Admin hệ thống có toàn quyền
@@ -37,7 +45,10 @@ export async function requirePermission(permissionCode: string): Promise<AuthCon
   }
 
   if (!ctx.permissions.has(permissionCode)) {
-    throw new BusinessError("FORBIDDEN", `Bạn không có quyền thực hiện chức năng này.`);
+    throw new BusinessError(
+      "FORBIDDEN",
+      `Bạn không có quyền thực hiện chức năng này.`,
+    );
   }
 
   return ctx;
@@ -54,7 +65,10 @@ export async function requireRole(roleCode: string): Promise<AuthContext> {
   }
 
   if (!ctx.roleCodes.includes(roleCode)) {
-    throw new BusinessError("FORBIDDEN", `Thao tác yêu cầu vai trò '${roleCode}'.`);
+    throw new BusinessError(
+      "FORBIDDEN",
+      `Thao tác yêu cầu vai trò '${roleCode}'.`,
+    );
   }
 
   return ctx;
@@ -82,9 +96,9 @@ async function getUnitTreeIds(unitId: string): Promise<string[]> {
 }
 
 interface DataScopeOptions {
-  creatorField?: string;   // Mặc định: "creatorId"
-  unitField?: string;      // Mặc định: "draftUnitId"
-  assigneeField?: string;  // Dùng khi filter handler: "assigneeId"
+  creatorField?: string; // Mặc định: "creatorId"
+  unitField?: string; // Mặc định: "draftUnitId"
+  assigneeField?: string; // Dùng khi filter handler: "assigneeId"
 }
 
 /**
@@ -93,14 +107,15 @@ interface DataScopeOptions {
 export async function buildDataScopeFilter(
   ctx: AuthContext,
   permissionCode: string,
-  options: DataScopeOptions = {}
+  options: DataScopeOptions = {},
 ): Promise<Record<string, unknown>> {
   // Admin luôn xem được tất cả metadata
   if (ctx.roleCodes.includes("ADMIN")) {
     return {};
   }
 
-  const scope: DataScope = ctx.permissions.get(permissionCode) || "OWN";
+  if (!ctx.permissions.has(permissionCode)) return { id: "__no_access__" };
+  const scope: DataScope = ctx.permissions.get(permissionCode)!;
   const creatorField = options.creatorField || "creatorId";
   const unitField = options.unitField || "draftUnitId";
   const primaryUnitId = ctx.primaryPosition?.unitId;
@@ -115,10 +130,7 @@ export async function buildDataScopeFilter(
       }
       const unitIds = await getUnitTreeIds(primaryUnitId);
       return {
-        OR: [
-          { [unitField]: { in: unitIds } },
-          { [creatorField]: ctx.userId },
-        ],
+        OR: [{ [unitField]: { in: unitIds } }, { [creatorField]: ctx.userId }],
       };
     }
 
@@ -127,10 +139,7 @@ export async function buildDataScopeFilter(
         return { [creatorField]: ctx.userId };
       }
       return {
-        OR: [
-          { [unitField]: primaryUnitId },
-          { [creatorField]: ctx.userId },
-        ],
+        OR: [{ [unitField]: primaryUnitId }, { [creatorField]: ctx.userId }],
       };
     }
 
@@ -139,7 +148,9 @@ export async function buildDataScopeFilter(
       return {
         OR: [
           { [creatorField]: ctx.userId },
-          { handlers: { some: { assigneeId: ctx.userId } } },
+          ...(permissionCode.startsWith("doc.")
+            ? [{ handlers: { some: { assigneeId: ctx.userId } } }]
+            : []),
         ],
       };
   }

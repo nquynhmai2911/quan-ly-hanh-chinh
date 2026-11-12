@@ -5,11 +5,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/guard";
 import { Permissions } from "@/lib/constants";
-import { successResponse, paginatedResponse, errorResponse } from "@/lib/api-response";
+import {
+  successResponse,
+  paginatedResponse,
+  errorResponse,
+} from "@/lib/api-response";
 import { BusinessError } from "@/lib/errors";
 import { hashPassword } from "@/lib/auth/password";
 import { createUserSchema } from "@/modules/auth/schema";
-import { DEMO_USERS } from "@/lib/demo-data";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +20,10 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const pageSize = Math.max(1, parseInt(searchParams.get("pageSize") || "20", 10));
+    const pageSize = Math.max(
+      1,
+      parseInt(searchParams.get("pageSize") || "20", 10),
+    );
     const search = searchParams.get("search")?.trim() || "";
 
     const where: Record<string, unknown> = {};
@@ -65,31 +71,7 @@ export async function GET(request: NextRequest) {
 
     return paginatedResponse(users, { page, pageSize, total });
   } catch (error) {
-    console.warn("[AdminUsers] Database offline, returning demo users:", (error as Error).message);
-    const users = Object.values(DEMO_USERS).map((u) => ({
-      id: u.id,
-      employeeCode: u.employeeCode,
-      fullName: u.fullName,
-      email: u.email,
-      phone: "0912345678",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      positions: [
-        {
-          id: `up-${u.id}`,
-          isPrimary: true,
-          unit: { id: `unit-${u.unitCode.toLowerCase()}`, name: u.unitName, code: u.unitCode },
-          position: { id: `pos-${u.id}`, name: u.positionName, code: u.roleCode },
-          roles: [
-            {
-              role: { id: `role-${u.roleCode.toLowerCase()}`, name: u.roleCode, code: u.roleCode },
-              dataScope: u.dataScope,
-            },
-          ],
-        },
-      ],
-    }));
-    return paginatedResponse(users, { page: 1, pageSize: 20, total: users.length });
+    return errorResponse(error);
   }
 }
 
@@ -101,7 +83,10 @@ export async function POST(request: NextRequest) {
     const parsed = createUserSchema.safeParse(body);
 
     if (!parsed.success) {
-      throw new BusinessError("VALIDATION_ERROR", parsed.error.issues[0]?.message);
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        parsed.error.issues[0]?.message,
+      );
     }
 
     const { employeeCode, fullName, email, phone, password } = parsed.data;
@@ -113,10 +98,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (existing) {
-      throw new BusinessError("CONFLICT", "Email hoặc Mã nhân viên đã tồn tại trên hệ thống.");
+      throw new BusinessError(
+        "CONFLICT",
+        "Email hoặc Mã nhân viên đã tồn tại trên hệ thống.",
+      );
     }
 
-    const passwordToHash = password && password.trim().length >= 6 ? password : "User@123";
+    const passwordToHash =
+      password && password.trim().length >= 6 ? password : "User@123";
     const passwordHash = await hashPassword(passwordToHash);
 
     const newUser = await prisma.user.create({

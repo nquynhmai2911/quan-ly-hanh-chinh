@@ -61,6 +61,7 @@ export default function ArchivesPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchArchives();
   }, [page, pageSize, search]);
 
@@ -95,7 +96,7 @@ export default function ArchivesPage() {
     }
   }
 
-  const columns: ColumnDef<ArchiveItem, any>[] = [
+  const columns: ColumnDef<ArchiveItem, unknown>[] = [
     {
       accessorKey: "code",
       header: "Mã hồ sơ",

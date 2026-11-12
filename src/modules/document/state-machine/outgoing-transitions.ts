@@ -15,13 +15,13 @@ export const outgoingTransitions: TransitionRule[] = [
     labelVi: "Trình duyệt dự thảo",
     isOptimisticAllowed: true,
     condition: (ctx) => {
-      // Bắt buộc phải có file đính kèm trước khi trình
+      // Bắt buộc phải có tệp đính kèm trước khi trình
       if (ctx.additionalData && ctx.additionalData.hasFile === false) {
         return false;
       }
       return true;
     },
-    conditionDescriptionVi: "Dự thảo bắt buộc phải có ít nhất một file đính kèm",
+    conditionDescriptionVi: "Dự thảo bắt buộc phải có ít nhất một tệp đính kèm",
     notifyTargetRole: [SystemRoles.DEPT_HEAD],
     notifyTitleTemplate: "Dự thảo văn bản đi mới chờ duyệt sơ bộ",
   },
@@ -73,7 +73,7 @@ export const outgoingTransitions: TransitionRule[] = [
     to: "APPROVED",
     allowedRoles: [SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.OUTGOING_APPROVE,
-    labelVi: "Phê duyệt & Ký số",
+    labelVi: "Phê duyệt điện tử",
     isOptimisticAllowed: true,
     notifyTargetRole: [SystemRoles.CLERK],
     notifyTitleTemplate: "Văn bản đi đã được ký duyệt, chờ văn thư cấp số",
@@ -90,7 +90,8 @@ export const outgoingTransitions: TransitionRule[] = [
     labelVi: "Trả lại dự thảo",
     isOptimisticAllowed: true,
     notifyTargetRole: [SystemRoles.SPECIALIST, SystemRoles.DEPT_HEAD],
-    notifyTitleTemplate: "Lãnh đạo không đồng ý duyệt dự thảo, yêu cầu hoàn thiện lại",
+    notifyTitleTemplate:
+      "Lãnh đạo không đồng ý duyệt dự thảo, yêu cầu hoàn thiện lại",
   },
 
   // 7. Văn thư vào sổ và cấp số văn bản (QUY TẮC: KHÔNG DÙNG OPTIMISTIC UI)
@@ -115,7 +116,11 @@ export const outgoingTransitions: TransitionRule[] = [
     requiredPermission: Permissions.OUTGOING_ISSUE,
     labelVi: "Ban hành văn bản",
     isOptimisticAllowed: false, // Ban hành chính thức, khóa file
-    notifyTargetRole: [SystemRoles.SPECIALIST, SystemRoles.DEPT_HEAD, SystemRoles.LEADER],
+    notifyTargetRole: [
+      SystemRoles.SPECIALIST,
+      SystemRoles.DEPT_HEAD,
+      SystemRoles.LEADER,
+    ],
     notifyTitleTemplate: "Văn bản đã được ban hành chính thức",
   },
 
@@ -129,7 +134,11 @@ export const outgoingTransitions: TransitionRule[] = [
     requiresReason: true,
     labelVi: "Thu hồi văn bản",
     isOptimisticAllowed: false,
-    notifyTargetRole: [SystemRoles.SPECIALIST, SystemRoles.DEPT_HEAD, SystemRoles.LEADER],
+    notifyTargetRole: [
+      SystemRoles.SPECIALIST,
+      SystemRoles.DEPT_HEAD,
+      SystemRoles.LEADER,
+    ],
     notifyTitleTemplate: "Văn bản đã ban hành bị thu hồi",
   },
 
@@ -143,7 +152,11 @@ export const outgoingTransitions: TransitionRule[] = [
     requiresReason: true,
     labelVi: "Thay thế văn bản",
     isOptimisticAllowed: false,
-    notifyTargetRole: [SystemRoles.SPECIALIST, SystemRoles.DEPT_HEAD, SystemRoles.LEADER],
+    notifyTargetRole: [
+      SystemRoles.SPECIALIST,
+      SystemRoles.DEPT_HEAD,
+      SystemRoles.LEADER,
+    ],
     notifyTitleTemplate: "Văn bản đã ban hành bị thay thế",
   },
 
@@ -152,7 +165,11 @@ export const outgoingTransitions: TransitionRule[] = [
     from: "DRAFT",
     action: "CANCEL",
     to: "CANCELLED",
-    allowedRoles: [SystemRoles.SPECIALIST, SystemRoles.DEPT_HEAD, SystemRoles.ADMIN],
+    allowedRoles: [
+      SystemRoles.SPECIALIST,
+      SystemRoles.DEPT_HEAD,
+      SystemRoles.ADMIN,
+    ],
     requiredPermission: Permissions.OUTGOING_CANCEL,
     requiresReason: true,
     labelVi: "Hủy dự thảo",

@@ -20,7 +20,7 @@ Dự án **Quản lý hành chính (E-Office)** là giải pháp phần mềm qu
 | **Form & Validate**| **React Hook Form**, **Zod** | Validation 2 chiều (Client & Server schemas) |
 | **State & Data** | **TanStack Query (React Query v5)**, **TanStack Table v8** | Quản lý cache và bảng dữ liệu chuyên sâu |
 | **Database & ORM** | **PostgreSQL**, **Prisma ORM v6** | Migration, relational queries, full-text search |
-| **Local Dev DB** | **Embedded Postgres (Windows x64)** | Chạy CSDL PostgreSQL cục bộ mà không cần cài thêm DB server |
+| **Local Dev DB** | **Embedded Postgres (macOS / Windows / Linux)** | Chạy CSDL PostgreSQL cục bộ mà không cần cài thêm DB server |
 | **Bảo mật & Auth** | **Jose (JWT)**, **bcryptjs** | HttpOnly Cookie Session, Role-Based Access Control (RBAC) |
 
 ---
@@ -35,7 +35,7 @@ Hệ thống hỗ trợ 6 vai trò chính theo chuẩn quy trình hành chính c
 | **LEADER** | Giám đốc (Nguyễn Văn An) | `giamdoc@eoffice.local` | `GD001` | **`Demo@123`** | Cho ý kiến chỉ đạo bút phê văn bản đến, phê duyệt và ký duyệt văn bản đi |
 | **DEPT_HEAD** | Trưởng phòng (Trần Thị Bình) | `truongphong.tchc@eoffice.local` | `TP001` | **`Demo@123`** | Duyệt sơ bộ văn bản, phân công thụ lý cho chuyên viên, theo dõi tiến độ |
 | **CLERK** | Văn thư (Lê Văn Cường) | `vanthu@eoffice.local` | `VT001` | **`Demo@123`** | Tiếp nhận văn bản đến, vào sổ, cấp số đến/đi, phát hành văn bản |
-| **SPECIALIST** | Chuyên viên (Phạm Minh Đức) | `chuyenvien.tchc@eoffice.local` | `CV001` | **`Demo@123`** | Thụ lý văn bản đến, báo cáo tiến độ, soạn dự thảo văn bản đi |
+| **SPECIALIST** | Chuyên viên (Phạm Thị Dung) | `chuyenvien.tchc@eoffice.local` | `CV001` | **`Demo@123`** | Thụ lý văn bản đến, báo cáo tiến độ, soạn dự thảo văn bản đi |
 | **CITIZEN** | Người dân / Doanh nghiệp | `nguoidan@eoffice.local` | `CD001` | **`Demo@123`** | Nộp hồ sơ / văn bản trực tuyến qua cổng dịch vụ công |
 
 ---
@@ -124,3 +124,7 @@ Hệ thống sẽ chạy tại địa chỉ: `http://localhost:3001` (hoặc `ht
 - **Nghị định 30/2020/NĐ-CP**: Quy định về công tác văn thư, định dạng thể thức số ký hiệu văn bản (`{number}/{typeCode}-{unitCode}`).
 - **RBAC (Role-Based Access Control)**: Phân quyền ma trận giữa Vai trò, Quyền hạn (Permissions) và Phạm vi dữ liệu (DataScope: `ALL`, `UNIT_TREE`, `UNIT`, `OWN`).
 - **Audit Logs**: Ghi vết mọi hành động nghiệp vụ quan trọng (đăng nhập, tiếp nhận, chuyển trạng thái, ký duyệt, sửa/xóa).
+
+## Quy trình theo vai trò và kiểm thử
+
+Xem [Quy trình và kiểm thử cục bộ](docs/quy-trinh-va-kiem-thu.md) để biết người nhận ở từng bước, cách xử lý hồ sơ cũ thiếu dữ liệu, giới hạn phê duyệt điện tử và lệnh kiểm thử.

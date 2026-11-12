@@ -85,6 +85,7 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
   }, [page, pageSize, search]);
 
@@ -161,7 +162,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const columns: ColumnDef<UserItem, any>[] = [
+  const columns: ColumnDef<UserItem, unknown>[] = [
     {
       accessorKey: "employeeCode",
       header: "Mã NV",

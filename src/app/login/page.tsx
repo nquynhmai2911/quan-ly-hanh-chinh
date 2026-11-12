@@ -44,8 +44,14 @@ export default function LoginPage() {
         return;
       }
 
-      toast.success(`Chào mừng ${result.data.user.fullName} đã đăng nhập thành công!`);
-      router.push("/documents/incoming");
+      toast.success(
+        `Chào mừng ${result.data.user.fullName} đã đăng nhập thành công!`,
+      );
+      router.push(
+        result.data.roles?.includes("CITIZEN")
+          ? "/citizen/submit"
+          : "/documents/incoming",
+      );
       router.refresh();
     } catch {
       toast.error("Không thể kết nối đến máy chủ.");
@@ -90,7 +96,9 @@ export default function LoginPage() {
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-xs text-rose-400">{errors.email.message}</p>
+                <p className="mt-1 text-xs text-rose-400">
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
@@ -108,7 +116,9 @@ export default function LoginPage() {
                 />
               </div>
               {errors.password && (
-                <p className="mt-1 text-xs text-rose-400">{errors.password.message}</p>
+                <p className="mt-1 text-xs text-rose-400">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 

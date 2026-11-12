@@ -36,12 +36,21 @@ interface SidebarProps {
   userRoles?: string[];
 }
 
-export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps) {
+export function Sidebar({
+  isCollapsed,
+  onToggle,
+  userRoles = [],
+}: SidebarProps) {
   const pathname = usePathname();
   const [adminOpen, setAdminOpen] = useState(true);
 
   const isAdmin = userRoles.includes("ADMIN");
 
+  const citizenOnly =
+    userRoles.includes("CITIZEN") &&
+    !userRoles.some((r) =>
+      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+    );
   const navSections = [
     {
       title: "ĐIỀU HÀNH",
@@ -117,32 +126,49 @@ export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps)
     },
   ];
 
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) =>
+        citizenOnly
+          ? ["/citizen/submit", "/notifications"].includes(item.href)
+          : item.href !== "/citizen/submit" || isAdmin,
+      ),
+    }))
+    .filter((section) => section.items.length);
   const adminItems = [
     { name: "Người dùng & Nhân sự", href: "/admin/users", icon: Users },
     { name: "Cây Đơn vị / Phòng ban", href: "/admin/units", icon: Building2 },
     { name: "Chức danh", href: "/admin/positions", icon: Briefcase },
     { name: "Phân quyền & Vai trò", href: "/admin/roles", icon: ShieldCheck },
     { name: "Cấu hình Sổ văn bản", href: "/admin/books", icon: BookOpen },
-    { name: "Nhật ký hệ thống (Audit)", href: "/admin/audit-logs", icon: History },
+    { name: "Nhật ký hệ thống", href: "/admin/audit-logs", icon: History },
   ];
 
   return (
     <aside
       className={cn(
         "bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 transition-all duration-300 select-none z-30 shrink-0",
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-16" : "w-64",
       )}
     >
       {/* Brand Header */}
       <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-800 bg-slate-950/40">
         {!isCollapsed && (
-          <Link href="/documents/incoming" className="flex items-center gap-2.5 overflow-hidden">
+          <Link
+            href="/documents/incoming"
+            className="flex items-center gap-2.5 overflow-hidden"
+          >
             <div className="h-8 w-8 rounded bg-indigo-600 flex items-center justify-center text-white font-bold text-base shrink-0 shadow-md">
               EO
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-white tracking-wide text-sm leading-tight">E-OFFICE</span>
-              <span className="text-[10px] text-slate-400 font-medium">Văn bản & Điều hành</span>
+              <span className="font-bold text-white tracking-wide text-sm leading-tight">
+                E-OFFICE
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                Văn bản & Điều hành
+              </span>
             </div>
           </Link>
         )}
@@ -155,16 +181,24 @@ export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps)
 
         <button
           onClick={onToggle}
-          title={isCollapsed ? "Mở rộng sidebar (Ctrl+B)" : "Thu gọn sidebar (Ctrl+B)"}
+          title={
+            isCollapsed
+              ? "Mở rộng sidebar (Ctrl+B)"
+              : "Thu gọn sidebar (Ctrl+B)"
+          }
           className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-auto"
         >
-          {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          {isCollapsed ? (
+            <PanelLeft className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
         </button>
       </div>
 
       {/* Navigation List */}
       <div className="flex-1 overflow-y-auto py-3 px-2 space-y-6">
-        {navSections.map((section, idx) => (
+        {visibleSections.map((section, idx) => (
           <div key={idx} className="space-y-1">
             {!isCollapsed && (
               <div className="px-3 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
@@ -183,11 +217,20 @@ export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps)
                     "flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition-colors group relative",
                     isActive
                       ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                      : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                      : "text-slate-300 hover:bg-slate-800/80 hover:text-white",
                   )}
                 >
-                  <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200")} />
-                  {!isCollapsed && <span className="truncate flex-1">{item.name}</span>}
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      isActive
+                        ? "text-white"
+                        : "text-slate-400 group-hover:text-slate-200",
+                    )}
+                  />
+                  {!isCollapsed && (
+                    <span className="truncate flex-1">{item.name}</span>
+                  )}
                 </Link>
               );
             })}
@@ -195,7 +238,7 @@ export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps)
         ))}
 
         {/* Quản trị hệ thống (Chỉ hiển thị với Admin hoặc khi chưa phân quyền triệt để) */}
-        {(isAdmin || userRoles.length === 0) && (
+        {isAdmin && (
           <div className="space-y-1 pt-2 border-t border-slate-800/80">
             {!isCollapsed ? (
               <button
@@ -206,7 +249,11 @@ export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps)
                   <Layers className="h-3 w-3" />
                   QUẢN TRỊ HỆ THỐNG
                 </span>
-                {adminOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                {adminOpen ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
               </button>
             ) : null}
 
@@ -223,11 +270,20 @@ export function Sidebar({ isCollapsed, onToggle, userRoles = [] }: SidebarProps)
                       "flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition-colors group relative",
                       isActive
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                        : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                        : "text-slate-300 hover:bg-slate-800/80 hover:text-white",
                     )}
                   >
-                    <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200")} />
-                    {!isCollapsed && <span className="truncate">{item.name}</span>}
+                    <Icon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        isActive
+                          ? "text-white"
+                          : "text-slate-400 group-hover:text-slate-200",
+                      )}
+                    />
+                    {!isCollapsed && (
+                      <span className="truncate">{item.name}</span>
+                    )}
                   </Link>
                 );
               })}

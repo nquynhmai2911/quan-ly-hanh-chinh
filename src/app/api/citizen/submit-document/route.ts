@@ -1,124 +1,147 @@
-// src/app/api/citizen/submit-document/route.ts
-// API tiếp nhận văn bản / đơn kiến nghị trực tuyến từ Người dân & Doanh nghiệp
-
 import { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { BusinessError } from "@/lib/errors";
-import { DEMO_DOCUMENTS } from "@/lib/demo-data";
-import { DocumentStatus, UrgencyLevel, SecurityLevel } from "@prisma/client";
+import { claimUpload } from "@/lib/storage/claim-upload";
+import { notify } from "@/modules/document/incoming/workflow";
 
+const schema = z.object({
+  senderName: z.string().trim().min(2).max(255),
+  senderPhone: z.string().trim().min(7).max(30),
+  senderEmail: z.union([z.email(), z.literal("")]).optional(),
+  senderAddress: z.string().max(500).optional(),
+  title: z.string().trim().min(5).max(1000),
+  note: z.string().max(1000).optional(),
+  docType: z.enum([
+    "Đơn kiến nghị / Phản ánh",
+    "Đơn đề nghị giải quyết thủ tục",
+    "Công văn đề xuất",
+    "Báo cáo tình hình",
+    "Khác",
+  ]),
+  urgency: z.enum(["NORMAL", "URGENT", "FIRE"]).default("NORMAL"),
+  attachments: z
+    .array(z.object({ uploadId: z.string().min(1) }))
+    .min(1, "Vui lòng đính kèm ít nhất một tệp gốc.")
+    .max(10, "Mỗi hồ sơ tối đa 10 tệp."),
+});
 export async function POST(request: NextRequest) {
   try {
     const ctx = await requireAuth();
-    const body = await request.json();
-
-    const {
-      senderName,
-      senderPhone,
-      senderEmail,
-      senderAddress,
-      title,
-      docType,
-      urgency = "NORMAL",
-      fileName,
-      fileSize,
-      fileKey,
-      note,
-    } = body;
-
-    if (!title || !title.trim()) {
-      throw new BusinessError("VALIDATION_ERROR", "Vui lòng nhập trích yếu nội dung văn bản.");
-    }
-    if (!senderName || !senderName.trim()) {
-      throw new BusinessError("VALIDATION_ERROR", "Vui lòng nhập họ tên người gửi hoặc tên doanh nghiệp.");
-    }
-
-    const onlineCode = `DTT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-
-    const newDoc = {
-      id: `doc-citizen-${Date.now()}`,
-      documentType: "INCOMING" as const,
-      direction: "INCOMING" as const,
-      title: title.trim(),
-      documentNumber: null, // Chờ văn thư vào sổ cấp số đến chính thức
-      documentNumberYear: new Date().getFullYear(),
-      documentOrder: 999,
-      originalCode: onlineCode,
-      senderName: senderName.trim(),
-      senderOrg: {
-        id: "org-citizen",
-        name: `${senderName.trim()} (Người dân / Doanh nghiệp)`,
-        code: "CD-DN",
-        address: senderAddress || "Toàn quốc",
-        phone: senderPhone || "",
-      },
-      issuedDate: new Date().toISOString(),
-      receivedDate: new Date().toISOString(),
-      processingDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      status: "RECEIVED" as DocumentStatus, // Chờ văn thư thẩm tra và vào sổ tiếp nhận
-      urgency: (urgency as UrgencyLevel) || "NORMAL",
-      security: "NORMAL" as SecurityLevel,
-      isArchived: false,
-      summaryNotes: note || `Đơn kiến nghị / Phản ánh nộp trực tuyến qua Cổng tiếp nhận. Người gửi: ${senderName.trim()} - SĐT: ${senderPhone || "Chưa có"}`,
-      documentBook: { id: "book-den", name: "Sổ văn bản đến chung", code: "SVB-DEN" },
-      docType: { id: "type-kn", name: docType || "Đơn kiến nghị / Phản ánh", code: "KN" },
-      documentTypeDetail: { id: "type-kn", name: docType || "Đơn kiến nghị / Phản ánh", code: "KN" },
-      draftUnit: { id: "unit-vp", name: "Văn phòng cơ quan (Bộ phận Tiếp nhận)", code: "VP" },
-      creator: { id: ctx.userId, fullName: senderName.trim(), employeeCode: "CITIZEN" },
-      handlers: [],
-      files: [
-        {
-          id: `file-${Date.now()}`,
-          fileName: fileName || "Don-kien-nghi-truc-tuyen.pdf",
-          fileSize: fileSize || 450000,
-          fileKey: fileKey || null,
-          mimeType: fileName?.endsWith(".docx") || fileName?.endsWith(".doc") ? "application/msword" : "application/pdf",
-          isCurrent: true,
-          version: 1,
-        },
-      ],
-      timeline: [
-        {
-          id: `log-${Date.now()}`,
-          action: "NỘP VĂN BẢN TRỰC TUYẾN",
-          actor: { fullName: senderName.trim() },
-          createdAt: new Date().toISOString(),
-          description: `Người dân đã nộp văn bản trực tuyến thành công. Mã hồ sơ tra cứu: ${onlineCode}. Chờ Văn thư tiếp nhận vào sổ.`,
-        },
-      ],
-      createdAt: new Date().toISOString(),
-    };
-
-    // Đẩy vào DEMO_DOCUMENTS để hiển thị ngay lập tức trong toàn hệ thống
-    DEMO_DOCUMENTS.unshift(newDoc as any);
-
-    try {
-      // Nếu DB online thì ghi vào Postgres
-      const defaultType = await prisma.documentType.findFirst();
-      if (defaultType) {
-        await prisma.document.create({
-          data: {
-            direction: "INCOMING",
-            title: newDoc.title,
-            originalCode: onlineCode,
-            senderName: newDoc.senderName,
-            status: "RECEIVED",
-            urgency: newDoc.urgency,
-            security: "NORMAL",
-            creatorId: ctx.userId,
-            documentTypeId: defaultType.id,
+    if (!ctx.roleCodes.some((r) => ["CITIZEN", "ADMIN"].includes(r)))
+      throw new BusinessError(
+        "FORBIDDEN",
+        "Chức năng nộp trực tuyến dành cho tài khoản người dân.",
+      );
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success)
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        parsed.error.issues[0]?.message,
+      );
+    const body = parsed.data;
+    const result = await prisma.$transaction(async (tx) => {
+      const files = [];
+      for (const ref of body.attachments)
+        files.push(await claimUpload(tx, ctx.userId, ref));
+      const type = await tx.documentType.findUnique({
+        where: { code: body.docType === "Báo cáo tình hình" ? "BC" : "CV" },
+      });
+      if (!type)
+        throw new BusinessError(
+          "CONFLICT",
+          "Chưa cấu hình loại văn bản. Vui lòng liên hệ văn thư.",
+        );
+      const onlineCode = `DTT-${new Date().getFullYear()}-${randomUUID().slice(0, 13).toUpperCase()}`;
+      const doc = await tx.document.create({
+        data: {
+          direction: "INCOMING",
+          status: "SUBMITTED",
+          title: body.title,
+          summaryNotes: body.note,
+          originalCode: onlineCode,
+          senderName: body.senderName,
+          urgency: body.urgency,
+          documentTypeId: type.id,
+          creatorId: ctx.userId,
+          workflow: {
+            create: {
+              trackingCode: onlineCode,
+              senderPhone: body.senderPhone,
+              senderEmail: body.senderEmail,
+              senderAddress: body.senderAddress,
+              submissionType: body.docType,
+            },
           },
-        });
-      }
-    } catch {}
-
-    return successResponse({
-      id: newDoc.id,
-      onlineCode,
-      message: `Đã gửi văn bản thành công! Mã tra cứu hồ sơ: ${onlineCode}`,
+          files: { create: files },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: ctx.userId,
+          action: "DOC_CITIZEN_SUBMIT",
+          tableName: "documents",
+          recordId: doc.id,
+          newState: { status: "SUBMITTED", filesCount: files.length },
+          reason: `Nộp hồ sơ trực tuyến: ${onlineCode}`,
+        },
+      });
+      const clerks = await tx.user.findMany({
+        where: {
+          isActive: true,
+          positions: {
+            some: {
+              endedAt: null,
+              roles: { some: { role: { code: "CLERK", isActive: true } } },
+            },
+          },
+        },
+        select: { id: true },
+      });
+      await notify(
+        tx,
+        ctx,
+        doc.id,
+        clerks.map((u) => u.id),
+        "Hồ sơ trực tuyến chờ tiếp nhận",
+        `Hồ sơ ${onlineCode}: ${doc.title}`,
+      );
+      return {
+        id: doc.id,
+        onlineCode,
+        message: "Hồ sơ và tệp đính kèm đã được lưu, chờ văn thư tiếp nhận.",
+      };
     });
+    return successResponse(result, 201);
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function GET() {
+  try {
+    const ctx = await requireAuth();
+    const documents = await prisma.document.findMany({
+      where: {
+        creatorId: ctx.userId,
+        direction: "INCOMING",
+        workflow: { trackingCode: { not: null } },
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        workflow: { select: { trackingCode: true } },
+        files: { select: { id: true, fileName: true, fileSize: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return successResponse(documents);
   } catch (error) {
     return errorResponse(error);
   }

@@ -3,9 +3,13 @@
 
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/auth/guard";
+import { requirePermission, buildDataScopeFilter } from "@/lib/auth/guard";
 import { Permissions } from "@/lib/constants";
-import { successResponse, paginatedResponse, errorResponse } from "@/lib/api-response";
+import {
+  successResponse,
+  paginatedResponse,
+  errorResponse,
+} from "@/lib/api-response";
 import { BusinessError } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
@@ -14,10 +18,19 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const pageSize = Math.max(1, parseInt(searchParams.get("pageSize") || "20", 10));
+    const pageSize = Math.max(
+      1,
+      parseInt(searchParams.get("pageSize") || "20", 10),
+    );
     const search = searchParams.get("search")?.trim() || "";
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {
+      AND: [
+        await buildDataScopeFilter(ctx, Permissions.ARCHIVE_VIEW, {
+          unitField: "unitId",
+        }),
+      ],
+    };
     if (search) {
       where.OR = [
         { code: { contains: search, mode: "insensitive" } },
@@ -51,10 +64,19 @@ export async function POST(request: NextRequest) {
     const ctx = await requirePermission(Permissions.ARCHIVE_MANAGE);
 
     const body = await request.json();
-    const { code, title, year = new Date().getFullYear(), retentionPeriod = "10 năm", description } = body;
+    const {
+      code,
+      title,
+      year = new Date().getFullYear(),
+      retentionPeriod = "10 năm",
+      description,
+    } = body;
 
     if (!code || !title) {
-      throw new BusinessError("VALIDATION_ERROR", "Mã hồ sơ và Tiêu đề không được để trống.");
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        "Mã hồ sơ và Tiêu đề không được để trống.",
+      );
     }
 
     const existing = await prisma.archive.findUnique({
@@ -65,6 +87,11 @@ export async function POST(request: NextRequest) {
       throw new BusinessError("CONFLICT", `Mã hồ sơ '${code}' đã tồn tại.`);
     }
 
+    if (!ctx.primaryPosition?.unitId)
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        "Tài khoản chưa được gán phòng ban lập hồ sơ.",
+      );
     const newArchive = await prisma.archive.create({
       data: {
         code,
@@ -72,7 +99,7 @@ export async function POST(request: NextRequest) {
         year: Number(year),
         retentionPeriod,
         description: description || null,
-        unitId: ctx.primaryPosition?.unitId || "default-unit",
+        unitId: ctx.primaryPosition.unitId,
         creatorId: ctx.userId,
       },
     });

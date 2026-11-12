@@ -3,24 +3,32 @@
 
 "use client";
 
+import { actionLabel } from "@/lib/display-labels";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  ShieldAlert,
   Search,
   Filter,
-  Clock,
-  User,
-  Activity,
   History,
   Lock,
-  Download,
 } from "lucide-react";
 
+interface AuditLog {
+  id: string;
+  createdAt: string;
+  action: string;
+  tableName: string;
+  recordId: string | null;
+  reason: string | null;
+  description: string | null;
+  ipAddress: string | null;
+  actor?: { fullName: string; employeeCode: string } | null;
+}
+
 export default function AuditLogsPage() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
@@ -55,20 +63,21 @@ export default function AuditLogsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLogs(false);
   }, [page]);
 
   function getActionBadge(actionName: string) {
     if (actionName.includes("ISSUE") || actionName.includes("APPROVE")) {
-      return <Badge variant="success">{actionName}</Badge>;
+      return <Badge variant="success">{actionLabel(actionName)}</Badge>;
     }
     if (actionName.includes("ASSIGN") || actionName.includes("ANNOTATE")) {
-      return <Badge variant="info">{actionName}</Badge>;
+      return <Badge variant="info">{actionLabel(actionName)}</Badge>;
     }
     if (actionName.includes("RECALL") || actionName.includes("CANCEL")) {
-      return <Badge variant="danger">{actionName}</Badge>;
+      return <Badge variant="danger">{actionLabel(actionName)}</Badge>;
     }
-    return <Badge variant="default">{actionName}</Badge>;
+    return <Badge variant="default">{actionLabel(actionName)}</Badge>;
   }
 
   return (
@@ -78,10 +87,11 @@ export default function AuditLogsPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <History className="h-6 w-6 text-indigo-600" />
-            Nhật ký hoạt động & Kiểm toán (Audit Trail)
+            Nhật ký hoạt động và kiểm toán
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Lịch sử toàn vẹn của mọi hành động trên hệ thống (Chỉ ghi nhận append-only, tuyệt đối không chỉnh sửa hoặc xóa)
+            Lịch sử toàn vẹn của mọi hành động trên hệ thống (Chỉ ghi bổ sung,
+            không chỉnh sửa hoặc xóa)
           </p>
         </div>
 
@@ -114,22 +124,36 @@ export default function AuditLogsPage() {
               className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
             >
               <option value="">Tất cả loại hành động</option>
-              <option value="REGISTER_INCOMING">Vào sổ tiếp nhận</option>
-              <option value="ANNOTATE_DOCUMENT">Ghi bút phê lãnh đạo</option>
-              <option value="ASSIGN_SPECIALIST">Phân công chuyên viên</option>
-              <option value="SIGN_APPROVAL">Phê duyệt điện tử</option>
-              <option value="ISSUE_DOCUMENT">Ban hành văn bản</option>
-              <option value="RECALL_DOCUMENT">Thu hồi văn bản</option>
-              <option value="CANCEL_DOCUMENT">Hủy hiệu lực văn bản</option>
+              <option value="DOC_CREATE_INCOMING">Vào sổ tiếp nhận</option>
+              <option value="DOC_LEADER_ANNOTATE">Ghi bút phê lãnh đạo</option>
+              <option value="DOC_ASSIGN_HANDLERS">Phân công chuyên viên</option>
+              <option value="DOC_LEADER_APPROVE">Phê duyệt điện tử</option>
+              <option value="DOC_ISSUE">Ban hành văn bản</option>
+              <option value="DOC_RECALL">Thu hồi văn bản</option>
+              <option value="DOC_CANCEL">Hủy hiệu lực văn bản</option>
             </select>
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={() => { setSearch(""); setAction(""); loadLogs(true); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSearch("");
+              setAction("");
+              loadLogs(true);
+            }}
+          >
             Đặt lại
           </Button>
-          <Button variant="primary" size="sm" onClick={() => loadLogs(true)} isLoading={isLoading} className="gap-1.5">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => loadLogs(true)}
+            isLoading={isLoading}
+            className="gap-1.5"
+          >
             <Filter className="h-3.5 w-3.5" /> Lọc nhật ký
           </Button>
         </div>
@@ -146,7 +170,10 @@ export default function AuditLogsPage() {
         {isLoading ? (
           <div className="p-8 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-slate-100 rounded animate-pulse" />
+              <div
+                key={i}
+                className="h-10 bg-slate-100 rounded animate-pulse"
+              />
             ))}
           </div>
         ) : logs.length === 0 ? (
@@ -159,16 +186,23 @@ export default function AuditLogsPage() {
               <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3 whitespace-nowrap">Thời gian</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Người thực hiện</th>
+                  <th className="px-4 py-3 whitespace-nowrap">
+                    Người thực hiện
+                  </th>
                   <th className="px-4 py-3 whitespace-nowrap">Hành động</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Bảng / Đối tượng</th>
+                  <th className="px-4 py-3 whitespace-nowrap">
+                    Bảng / Đối tượng
+                  </th>
                   <th className="px-4 py-3">Nội dung chi tiết</th>
                   <th className="px-4 py-3 whitespace-nowrap">Địa chỉ IP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr
+                    key={log.id}
+                    className="hover:bg-slate-50/80 transition-colors"
+                  >
                     <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-[11px]">
                       {new Date(log.createdAt).toLocaleDateString("vi-VN", {
                         hour: "2-digit",
@@ -196,11 +230,21 @@ export default function AuditLogsPage() {
                     </td>
 
                     <td className="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-slate-600">
-                      {log.tableName} <span className="text-slate-400">({log.recordId?.slice(0, 8)}...)</span>
+                      {(
+                        {
+                          documents: "Văn bản",
+                          users: "Người dùng",
+                          document_files: "Tệp đính kèm",
+                          units: "Phòng ban",
+                        } as Record<string, string>
+                      )[log.tableName] || "Hồ sơ hệ thống"}{" "}
+                      <span className="text-slate-400">
+                        ({log.recordId?.slice(0, 8)}...)
+                      </span>
                     </td>
 
                     <td className="px-4 py-3 text-slate-700">
-                      {log.description}
+                      {log.reason || log.description || actionLabel(log.action)}
                     </td>
 
                     <td className="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-slate-400">

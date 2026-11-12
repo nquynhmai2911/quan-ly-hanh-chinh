@@ -3,7 +3,7 @@
 
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/auth/guard";
+import { requirePermission, buildDataScopeFilter } from "@/lib/auth/guard";
 import { Permissions } from "@/lib/constants";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { BusinessError } from "@/lib/errors";
@@ -11,23 +11,32 @@ import { getAllowedActions } from "@/modules/document/state-machine";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const ctx = await requirePermission(Permissions.OUTGOING_VIEW);
     const { id: docId } = await params;
 
-    const doc = await prisma.document.findUnique({
-      where: { id: docId, direction: "OUTGOING" },
+    const doc = await prisma.document.findFirst({
+      where: {
+        AND: [
+          { id: docId, direction: "OUTGOING" },
+          await buildDataScopeFilter(ctx, Permissions.OUTGOING_VIEW),
+        ],
+      },
       include: {
-        documentBook: { select: { id: true, name: true, code: true, numberTemplate: true } },
+        documentBook: {
+          select: { id: true, name: true, code: true, numberTemplate: true },
+        },
         documentType: { select: { id: true, name: true, code: true } },
         field: { select: { id: true, name: true } },
         draftUnit: { select: { id: true, name: true, code: true } },
         creator: { select: { id: true, fullName: true, employeeCode: true } },
         approvals: {
           include: {
-            approver: { select: { id: true, fullName: true, employeeCode: true } },
+            approver: {
+              select: { id: true, fullName: true, employeeCode: true },
+            },
           },
           orderBy: { stepOrder: "asc" },
         },
@@ -39,7 +48,9 @@ export async function GET(
         },
         signatures: {
           include: {
-            signer: { select: { id: true, fullName: true, employeeCode: true } },
+            signer: {
+              select: { id: true, fullName: true, employeeCode: true },
+            },
           },
           orderBy: { signedAt: "desc" },
         },
@@ -47,7 +58,10 @@ export async function GET(
     });
 
     if (!doc) {
-      throw new BusinessError("NOT_FOUND", "Không tìm thấy văn bản đi / dự thảo.");
+      throw new BusinessError(
+        "NOT_FOUND",
+        "Không tìm thấy văn bản đi / dự thảo.",
+      );
     }
 
     const auditLogs = await prisma.auditLog.findMany({
@@ -74,48 +88,27 @@ export async function GET(
         documentNumber: doc.documentNumber,
       },
       additionalData: {
+        reviewerId: doc.approvals.find((a) => a.role === "REVIEWER")
+          ?.approverId,
+        approverId: doc.approvals.find((a) => a.role === "APPROVER")
+          ?.approverId,
         hasFile: doc.files.length > 0,
         hasSignature: doc.signatures.length > 0,
       },
     });
 
     return successResponse({
+      canAttach:
+        !doc.isLocked &&
+        ["DRAFT", "RETURNED"].includes(doc.status) &&
+        (ctx.roleCodes.includes("ADMIN") ||
+          (doc.creatorId === ctx.userId &&
+            ctx.permissions.has(Permissions.OUTGOING_CREATE))),
       document: doc,
       auditLogs,
       allowedActions,
     });
   } catch (error) {
-    console.warn("[OutgoingDocDetail] Database offline, checking DEMO_DOCUMENTS:", (error as Error).message);
-    const { id: docId } = await params;
-    const { DEMO_DOCUMENTS } = await import("@/lib/demo-data");
-    const demoDoc = DEMO_DOCUMENTS.find((d) => d.id === docId);
-    if (demoDoc) {
-      return successResponse({
-        document: {
-          ...demoDoc,
-          direction: "OUTGOING",
-          documentBook: demoDoc.documentBook,
-          documentType: demoDoc.docType,
-          field: { name: "Hành chính tổng hợp" },
-          draftUnit: demoDoc.draftUnit,
-          creator: demoDoc.creator,
-          approvals: demoDoc.approvals || [],
-          handlers: demoDoc.handlers || [],
-          files: demoDoc.files || [],
-        },
-        auditLogs: demoDoc.timeline || [],
-        allowedActions: [
-          {
-            action: "LEADER_APPROVE",
-            label: "Phê duyệt văn bản",
-            variant: "primary",
-            targetStatus: "APPROVED",
-            requiresComment: false,
-            confirmMessage: "Bạn có chắc chắn muốn phê duyệt dự thảo này?",
-          },
-        ],
-      });
-    }
     return errorResponse(error);
   }
 }

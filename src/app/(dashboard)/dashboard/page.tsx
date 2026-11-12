@@ -7,6 +7,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DocumentStatusBadge, UrgencyBadge } from "@/components/ui/badge";
+import type { DocumentStatus, UrgencyLevel } from "@prisma/client";
 import {
   FileText,
   Send,
@@ -39,8 +40,8 @@ interface DashboardData {
     direction: "INCOMING" | "OUTGOING";
     documentNumber: string | null;
     title: string;
-    status: any;
-    urgency: any;
+    status: DocumentStatus;
+    urgency: UrgencyLevel;
     createdAt: string;
   }>;
 }

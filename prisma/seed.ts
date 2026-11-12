@@ -73,11 +73,36 @@ async function main() {
 
   // ── 3. Vai trò ────────────────────────────────────────────────────────────
   const rolesData = [
-    { code: "ADMIN", name: "Quản trị hệ thống", description: "Quản trị hệ thống, không truy cập nội dung văn bản" },
-    { code: "LEADER", name: "Lãnh đạo", description: "Bút phê, duyệt/ký văn bản đi" },
-    { code: "DEPT_HEAD", name: "Trưởng phòng", description: "Duyệt sơ bộ, phân công, xác nhận hoàn thành" },
-    { code: "CLERK", name: "Văn thư", description: "Vào sổ, cấp số, phát hành văn bản" },
-    { code: "SPECIALIST", name: "Chuyên viên", description: "Thụ lý văn bản, soạn dự thảo" },
+    {
+      code: "ADMIN",
+      name: "Quản trị hệ thống",
+      description: "Quản trị hệ thống, không truy cập nội dung văn bản",
+    },
+    {
+      code: "LEADER",
+      name: "Lãnh đạo",
+      description: "Bút phê, duyệt/ký văn bản đi",
+    },
+    {
+      code: "DEPT_HEAD",
+      name: "Trưởng phòng",
+      description: "Duyệt sơ bộ, phân công, xác nhận hoàn thành",
+    },
+    {
+      code: "CLERK",
+      name: "Văn thư",
+      description: "Vào sổ, cấp số, phát hành văn bản",
+    },
+    {
+      code: "CITIZEN",
+      name: "Người dân",
+      description: "Nộp và theo dõi hồ sơ của mình",
+    },
+    {
+      code: "SPECIALIST",
+      name: "Chuyên viên",
+      description: "Thụ lý văn bản, soạn dự thảo",
+    },
   ];
 
   const roles: Record<string, string> = {};
@@ -94,25 +119,97 @@ async function main() {
   // ── 4. Quyền (Permissions) ────────────────────────────────────────────────
   const permissionsData = [
     // Văn bản đến
-    { code: "doc.incoming.view", name: "Xem văn bản đến", module: "doc.incoming" },
-    { code: "doc.incoming.create", name: "Tiếp nhận văn bản đến", module: "doc.incoming" },
-    { code: "doc.incoming.register", name: "Vào sổ văn bản đến", module: "doc.incoming" },
-    { code: "doc.incoming.forward", name: "Trình văn bản đến", module: "doc.incoming" },
-    { code: "doc.incoming.annotate", name: "Bút phê văn bản đến", module: "doc.incoming" },
-    { code: "doc.incoming.assign", name: "Phân công xử lý", module: "doc.incoming" },
-    { code: "doc.incoming.process", name: "Xử lý văn bản đến", module: "doc.incoming" },
-    { code: "doc.incoming.complete", name: "Xác nhận hoàn thành", module: "doc.incoming" },
+    {
+      code: "doc.incoming.view",
+      name: "Xem văn bản đến",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.create",
+      name: "Tiếp nhận văn bản đến",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.register",
+      name: "Vào sổ văn bản đến",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.forward",
+      name: "Trình văn bản đến",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.annotate",
+      name: "Bút phê văn bản đến",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.assign",
+      name: "Phân công xử lý",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.process",
+      name: "Xử lý văn bản đến",
+      module: "doc.incoming",
+    },
+    {
+      code: "doc.incoming.complete",
+      name: "Xác nhận hoàn thành",
+      module: "doc.incoming",
+    },
     // Văn bản đi
-    { code: "doc.outgoing.view", name: "Xem văn bản đi", module: "doc.outgoing" },
-    { code: "doc.outgoing.create", name: "Tạo dự thảo văn bản đi", module: "doc.outgoing" },
-    { code: "doc.outgoing.review", name: "Duyệt sơ bộ văn bản đi", module: "doc.outgoing" },
-    { code: "doc.outgoing.approve", name: "Duyệt/ký văn bản đi", module: "doc.outgoing" },
-    { code: "doc.outgoing.sign", name: "Phê duyệt điện tử", module: "doc.outgoing" },
-    { code: "doc.outgoing.number", name: "Cấp số văn bản đi", module: "doc.outgoing" },
-    { code: "doc.outgoing.issue", name: "Ban hành văn bản đi", module: "doc.outgoing" },
-    { code: "doc.outgoing.recall", name: "Thu hồi văn bản", module: "doc.outgoing" },
-    { code: "doc.outgoing.replace", name: "Thay thế văn bản", module: "doc.outgoing" },
-    { code: "doc.outgoing.cancel", name: "Hủy văn bản", module: "doc.outgoing" },
+    {
+      code: "doc.outgoing.view",
+      name: "Xem văn bản đi",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.create",
+      name: "Tạo dự thảo văn bản đi",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.review",
+      name: "Duyệt sơ bộ văn bản đi",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.approve",
+      name: "Duyệt/ký văn bản đi",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.sign",
+      name: "Phê duyệt điện tử",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.number",
+      name: "Cấp số văn bản đi",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.issue",
+      name: "Ban hành văn bản đi",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.recall",
+      name: "Thu hồi văn bản",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.replace",
+      name: "Thay thế văn bản",
+      module: "doc.outgoing",
+    },
+    {
+      code: "doc.outgoing.cancel",
+      name: "Hủy văn bản",
+      module: "doc.outgoing",
+    },
     // Danh mục
     { code: "catalog.view", name: "Xem danh mục", module: "catalog" },
     { code: "catalog.manage", name: "Quản lý danh mục", module: "catalog" },
@@ -123,9 +220,17 @@ async function main() {
     { code: "admin.system", name: "Cấu hình hệ thống", module: "admin" },
     // Hồ sơ lưu trữ
     { code: "archive.view", name: "Xem hồ sơ lưu trữ", module: "archive" },
-    { code: "archive.manage", name: "Quản lý hồ sơ lưu trữ", module: "archive" },
+    {
+      code: "archive.manage",
+      name: "Quản lý hồ sơ lưu trữ",
+      module: "archive",
+    },
     // Thông báo
-    { code: "notification.view", name: "Xem thông báo", module: "notification" },
+    {
+      code: "notification.view",
+      name: "Xem thông báo",
+      module: "notification",
+    },
   ];
 
   const perms: Record<string, string> = {};
@@ -142,30 +247,57 @@ async function main() {
   // ── 5. Gán quyền cho vai trò ──────────────────────────────────────────────
   const rolePermissionMap: Record<string, string[]> = {
     ADMIN: [
-      "admin.user.manage", "admin.role.manage", "admin.unit.manage", "admin.system",
-      "catalog.view", "catalog.manage",
+      "admin.user.manage",
+      "admin.role.manage",
+      "admin.unit.manage",
+      "admin.system",
+      "catalog.view",
+      "catalog.manage",
     ],
     LEADER: [
-      "doc.incoming.view", "doc.incoming.annotate", "doc.incoming.forward",
-      "doc.outgoing.view", "doc.outgoing.approve", "doc.outgoing.sign",
-      "doc.outgoing.recall", "doc.outgoing.replace", "doc.outgoing.cancel",
-      "catalog.view", "notification.view",
+      "doc.incoming.view",
+      "doc.incoming.annotate",
+      "doc.incoming.forward",
+      "doc.outgoing.view",
+      "doc.outgoing.approve",
+      "doc.outgoing.sign",
+      "doc.outgoing.recall",
+      "doc.outgoing.replace",
+      "doc.outgoing.cancel",
+      "catalog.view",
+      "notification.view",
     ],
     DEPT_HEAD: [
-      "doc.incoming.view", "doc.incoming.assign", "doc.incoming.complete",
-      "doc.outgoing.view", "doc.outgoing.review",
-      "catalog.view", "notification.view",
+      "doc.incoming.view",
+      "doc.incoming.assign",
+      "doc.incoming.complete",
+      "doc.incoming.process",
+      "doc.outgoing.view",
+      "doc.outgoing.review",
+      "catalog.view",
+      "notification.view",
     ],
     CLERK: [
-      "doc.incoming.view", "doc.incoming.create", "doc.incoming.register", "doc.incoming.forward",
-      "doc.outgoing.view", "doc.outgoing.number", "doc.outgoing.issue",
-      "catalog.view", "notification.view",
+      "doc.incoming.view",
+      "doc.incoming.create",
+      "doc.incoming.register",
+      "doc.incoming.forward",
+      "doc.outgoing.view",
+      "doc.outgoing.number",
+      "doc.outgoing.issue",
+      "catalog.view",
+      "notification.view",
     ],
+    CITIZEN: ["notification.view"],
     SPECIALIST: [
-      "doc.incoming.view", "doc.incoming.process",
-      "doc.outgoing.view", "doc.outgoing.create",
-      "catalog.view", "notification.view",
-      "archive.view", "archive.manage",
+      "doc.incoming.view",
+      "doc.incoming.process",
+      "doc.outgoing.view",
+      "doc.outgoing.create",
+      "catalog.view",
+      "notification.view",
+      "archive.view",
+      "archive.manage",
     ],
   };
 
@@ -350,6 +482,15 @@ async function main() {
 
   // ── 11. Tài khoản demo (để test luồng) ────────────────────────────────────
   const demoUsers = [
+    {
+      employeeCode: "CD001",
+      fullName: "Nguyễn Văn Dân",
+      email: "nguoidan@eoffice.local",
+      positionName: "Chuyên viên",
+      unitCode: "CQ",
+      roleCode: "CITIZEN",
+      dataScope: DataScope.OWN,
+    },
     {
       employeeCode: "GD001",
       fullName: "Nguyễn Văn An",

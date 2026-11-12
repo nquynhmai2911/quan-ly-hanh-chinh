@@ -7,12 +7,11 @@ import { requirePermission } from "@/lib/auth/guard";
 import { Permissions } from "@/lib/constants";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { BusinessError } from "@/lib/errors";
-import { defaultSignatureProvider } from "@/lib/signature";
 import { executeDocumentTransition } from "@/modules/document/state-machine";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const ctx = await requirePermission(Permissions.OUTGOING_APPROVE);
@@ -32,32 +31,23 @@ export async function POST(
     if (doc.status !== "PENDING_APPROVAL") {
       throw new BusinessError(
         "INVALID_TRANSITION",
-        `Văn bản đang ở trạng thái '${doc.status}', chỉ có thể ký khi ở trạng thái 'PENDING_APPROVAL'.`
+        "Văn bản chưa ở bước chờ lãnh đạo phê duyệt.",
       );
     }
 
     const currentFile = doc.files[0];
     if (!currentFile) {
-      throw new BusinessError("VALIDATION_ERROR", "Dự thảo không có file đính kèm để ký số.");
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        "Dự thảo không có tệp đính kèm để phê duyệt.",
+      );
     }
 
-    // 1. Thực hiện phê duyệt điện tử (lưu hash SHA-256)
-    const sigResult = await defaultSignatureProvider.signDocument({
-      documentId: doc.id,
-      fileId: currentFile.id,
-      signerId: ctx.userId,
-      fileHash: currentFile.fileHash,
-      certificateInfo: {
-        signerName: ctx.fullName,
-        signerEmployeeCode: ctx.employeeCode,
-        position: ctx.primaryPosition?.positionName || "Lãnh đạo",
-        signedTime: new Date().toISOString(),
-        fileHash: currentFile.fileHash,
-      },
-    });
-
     // 2. Chuyển trạng thái văn bản sang APPROVED qua State Machine
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || undefined;
+    const ip =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      undefined;
     const userAgent = request.headers.get("user-agent") || undefined;
 
     const updated = await executeDocumentTransition(
@@ -66,7 +56,7 @@ export async function POST(
         documentId: doc.id,
         action: "LEADER_APPROVE",
         actorId: ctx.userId,
-        reason: "Lãnh đạo phê duyệt và ký số điện tử",
+        reason: "Lãnh đạo phê duyệt điện tử",
         ipAddress: ip,
         userAgent,
       },
@@ -85,11 +75,10 @@ export async function POST(
           isLocked: doc.isLocked,
           documentNumber: doc.documentNumber,
         },
-      }
+      },
     );
 
     return successResponse({
-      signature: sigResult,
       document: updated,
     });
   } catch (error) {

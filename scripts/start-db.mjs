@@ -4,7 +4,7 @@ import fs from "fs";
 
 async function main() {
   console.log("Initializing embedded PostgreSQL...");
-  const dataDir = "D:\\eoffice-link\\.embedded-pg-data";
+  const dataDir = path.resolve(".embedded-pg-data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

@@ -18,7 +18,7 @@ datasource db {
 /// Cây đơn vị / phòng ban (đệ quy qua parentId)
 model Unit {
   id        String   @id @default(cuid())
-  name      String   /// Tên đơn vị: "Phòng Tổ chức - Hành chính"
+  name      String /// Tên đơn vị: "Phòng Tổ chức - Hành chính"
   code      String   @unique /// Ký hiệu: "TCHC"
   parentId  String?  @map("parent_id")
   level     Int      @default(0) /// Cấp trong cây (0 = gốc)
@@ -28,13 +28,14 @@ model Unit {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  parent           Unit?             @relation("UnitTree", fields: [parentId], references: [id])
-  children         Unit[]            @relation("UnitTree")
-  positions        UserPosition[]
-  documentBooks    DocumentBook[]
-  draftDocuments   Document[]        @relation("DraftUnit")
-  documentHandlers DocumentHandler[]
-  archives         Archive[]
+  parent            Unit?              @relation("UnitTree", fields: [parentId], references: [id])
+  children          Unit[]             @relation("UnitTree")
+  positions         UserPosition[]
+  documentBooks     DocumentBook[]
+  draftDocuments    Document[]         @relation("DraftUnit")
+  documentHandlers  DocumentHandler[]
+  archives          Archive[]
+  incomingWorkflows IncomingWorkflow[]
 
   @@index([parentId])
   @@index([code])
@@ -73,6 +74,11 @@ model User {
   lastLoginAt  DateTime? @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  incomingLed        IncomingWorkflow[] @relation("IncomingLeader")
+  incomingManaged    IncomingWorkflow[] @relation("IncomingHead")
+  incomingRegistered IncomingWorkflow[] @relation("IncomingRegistrar")
+  pendingUploads     PendingUpload[]
 
   // Relations
   positions             UserPosition[]
@@ -129,7 +135,7 @@ model UserPosition {
 model Role {
   id          String   @id @default(cuid())
   code        String   @unique /// "ADMIN", "LEADER", "DEPT_HEAD", "CLERK", "SPECIALIST"
-  name        String   /// "Quản trị hệ thống", "Lãnh đạo"
+  name        String /// "Quản trị hệ thống", "Lãnh đạo"
   description String?
   isSystem    Boolean  @default(false) @map("is_system") /// Vai trò mặc định, không xóa được
   isActive    Boolean  @default(true) @map("is_active")
@@ -147,8 +153,8 @@ model Role {
 model Permission {
   id          String   @id @default(cuid())
   code        String   @unique /// "doc.incoming.create", "doc.incoming.approve"
-  name        String   /// "Tạo văn bản đến"
-  module      String   /// "doc.incoming", "doc.outgoing", "catalog", "admin"
+  name        String /// "Tạo văn bản đến"
+  module      String /// "doc.incoming", "doc.outgoing", "catalog", "admin"
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -161,10 +167,10 @@ model Permission {
 
 /// Data Scope — phạm vi dữ liệu
 enum DataScope {
-  ALL       /// Toàn cơ quan
+  ALL /// Toàn cơ quan
   UNIT_TREE /// Đơn vị mình và đơn vị con
-  UNIT      /// Chỉ đơn vị mình
-  OWN       /// Chỉ do mình tạo/được giao
+  UNIT /// Chỉ đơn vị mình
+  OWN /// Chỉ do mình tạo/được giao
 }
 
 /// Gán quyền cho vai trò
@@ -224,15 +230,15 @@ model DocumentType {
 enum UrgencyLevel {
   NORMAL /// Thường
   URGENT /// Khẩn
-  FIRE   /// Hỏa tốc
+  FIRE /// Hỏa tốc
 }
 
 /// Độ mật
 enum SecurityLevel {
-  NORMAL       /// Thường
+  NORMAL /// Thường
   CONFIDENTIAL /// Mật
-  SECRET       /// Tối mật
-  TOP_SECRET   /// Tuyệt mật
+  SECRET /// Tối mật
+  TOP_SECRET /// Tuyệt mật
 }
 
 /// Lĩnh vực
@@ -253,7 +259,7 @@ model Field {
 /// Danh mục cơ quan / đơn vị bên ngoài (nơi gửi / nơi nhận văn bản)
 model ExternalOrganization {
   id        String   @id @default(cuid())
-  name      String   /// "Bộ Nội vụ"
+  name      String /// "Bộ Nội vụ"
   code      String   @unique /// "BNV"
   address   String?
   phone     String?
@@ -287,18 +293,18 @@ enum BookType {
 
 /// Sổ văn bản
 model DocumentBook {
-  id             String        @id @default(cuid())
-  name           String        /// "Sổ Công văn đi - TCHC 2026"
-  code           String        @unique /// "SCV-TCHC"
-  bookType       BookType      @map("book_type")
-  unitId         String?       @map("unit_id") /// Đơn vị sở hữu sổ (null = toàn cơ quan)
-  documentTypeId String?       @map("document_type_id") /// Loại văn bản (null = mọi loại)
+  id             String   @id @default(cuid())
+  name           String /// "Sổ Công văn đi - TCHC 2026"
+  code           String   @unique /// "SCV-TCHC"
+  bookType       BookType @map("book_type")
+  unitId         String?  @map("unit_id") /// Đơn vị sở hữu sổ (null = toàn cơ quan)
+  documentTypeId String?  @map("document_type_id") /// Loại văn bản (null = mọi loại)
   /// Mẫu số: {number}/{typeCode}-{unitCode}  →  142/CV-TCHC
-  numberTemplate String        @default("{number}/{typeCode}-{unitCode}") @map("number_template")
+  numberTemplate String   @default("{number}/{typeCode}-{unitCode}") @map("number_template")
   description    String?
-  isActive       Boolean       @default(true) @map("is_active")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
   unit         Unit?                 @relation(fields: [unitId], references: [id])
@@ -317,7 +323,7 @@ model DocumentBook {
 model DocumentBookCounter {
   id         String @id @default(cuid())
   bookId     String @map("book_id")
-  year       Int    /// Năm đánh số (2026, 2027...)
+  year       Int /// Năm đánh số (2026, 2027...)
   lastNumber Int    @default(0) @map("last_number") /// Số cuối cùng đã cấp
 
   book DocumentBook @relation(fields: [bookId], references: [id])
@@ -333,90 +339,93 @@ model DocumentBookCounter {
 /// Trạng thái văn bản hợp nhất (Được kiểm soát chặt qua State Machine)
 enum DocumentStatus {
   // Trạng thái chung & Văn bản đi
-  DRAFT            /// Dự thảo (VB đi)
-  PENDING_REVIEW   /// Chờ duyệt sơ bộ / Chờ Trưởng phòng duyệt hoàn thành
+  DRAFT /// Dự thảo (VB đi)
+  PENDING_REVIEW /// Chờ duyệt sơ bộ / Chờ Trưởng phòng duyệt hoàn thành
   PENDING_APPROVAL /// Chờ Lãnh đạo ký duyệt
-  APPROVED         /// Đã phê duyệt / Ký điện tử
-  NUMBERED         /// Đã cấp số & ngày ban hành
-  ISSUED           /// Đã ban hành chính thức (khóa sửa, khóa file)
-  RETURNED         /// Bị trả lại
-  RECALLED         /// Đã thu hồi (sau ban hành)
-  REPLACED         /// Đã bị thay thế (sau ban hành)
-  CANCELLED        /// Đã hủy
+  APPROVED /// Đã phê duyệt / Ký điện tử
+  NUMBERED /// Đã cấp số & ngày ban hành
+  ISSUED /// Đã ban hành chính thức (khóa sửa, khóa file)
+  RETURNED /// Bị trả lại
+  RECALLED /// Đã thu hồi (sau ban hành)
+  REPLACED /// Đã bị thay thế (sau ban hành)
+  CANCELLED /// Đã hủy
 
   // Trạng thái Văn bản đến
-  RECEIVED         /// Văn thư đã tiếp nhận, vào sổ
-  PENDING_LEADER   /// Đang trình Lãnh đạo xin ý kiến
-  DISTRIBUTED      /// Lãnh đạo đã bút phê, chuyển đơn vị/phòng ban
-  PROCESSING       /// Đang được chuyên viên/đơn vị thụ lý xử lý
-  COMPLETED        /// Hoàn thành xử lý toàn diện
+  SUBMITTED /// Người dân đã nộp, chờ văn thư tiếp nhận
+  RECEIVED /// Văn thư đã tiếp nhận, vào sổ
+  PENDING_LEADER /// Đang trình Lãnh đạo xin ý kiến
+  DISTRIBUTED /// Lãnh đạo đã bút phê, chuyển đơn vị/phòng ban
+  PROCESSING /// Đang được chuyên viên/đơn vị thụ lý xử lý
+  COMPLETED /// Hoàn thành xử lý toàn diện
 }
 
 /// Bảng văn bản cốt lõi (Văn bản Đến & Văn bản Đi)
 model Document {
-  id                 String            @id @default(cuid())
-  direction          DocumentDirection /// INCOMING | OUTGOING
-  status             DocumentStatus    @default(DRAFT)
-  title              String            /// Trích yếu nội dung văn bản
+  id        String            @id @default(cuid())
+  direction DocumentDirection /// INCOMING | OUTGOING
+  status    DocumentStatus    @default(DRAFT)
+  title     String /// Trích yếu nội dung văn bản
 
   // Đánh số & Vào sổ
-  documentBookId     String?           @map("document_book_id")
-  documentNumberYear Int?              @map("document_number_year") /// Năm cấp số
-  documentOrder      Int?              @map("document_order")       /// Số thứ tự cấp trong năm (VD: 142)
-  documentNumber     String?           @map("document_number")      /// Số/ký hiệu đầy đủ (VD: 142/CV-TCHC hoặc Số đến: 05)
+  documentBookId     String? @map("document_book_id")
+  documentNumberYear Int?    @map("document_number_year") /// Năm cấp số
+  documentOrder      Int?    @map("document_order") /// Số thứ tự cấp trong năm (VD: 142)
+  documentNumber     String? @map("document_number") /// Số/ký hiệu đầy đủ (VD: 142/CV-TCHC hoặc Số đến: 05)
 
   // Thông tin ngày tháng
-  issuedDate         DateTime?         @map("issued_date")          /// Ngày ban hành (VB đi) hoặc ngày trên văn bản (VB đến)
-  receivedDate       DateTime?         @map("received_date")        /// Ngày đến văn thư (chỉ VB đến)
-  processingDeadline DateTime?         @map("processing_deadline")  /// Hạn xử lý văn bản
+  issuedDate         DateTime? @map("issued_date") /// Ngày ban hành (VB đi) hoặc ngày trên văn bản (VB đến)
+  receivedDate       DateTime? @map("received_date") /// Ngày đến văn thư (chỉ VB đến)
+  processingDeadline DateTime? @map("processing_deadline") /// Hạn xử lý văn bản
 
   // Số hiệu gốc & Nơi gửi (đối với văn bản đến)
-  originalCode       String?           @map("original_code")        /// Số/ký hiệu gốc của cơ quan gửi (VD: 15/BC-BNV)
-  senderOrgId        String?           @map("sender_org_id")        /// Khóa ngoại ExternalOrganization nếu có
-  senderName         String?           @map("sender_name")          /// Tên cơ quan/nơi gửi trực tiếp
+  originalCode String? @map("original_code") /// Số/ký hiệu gốc của cơ quan gửi (VD: 15/BC-BNV)
+  senderOrgId  String? @map("sender_org_id") /// Khóa ngoại ExternalOrganization nếu có
+  senderName   String? @map("sender_name") /// Tên cơ quan/nơi gửi trực tiếp
 
   // Thông tin ký & soạn thảo (đối với văn bản đi)
-  signerName         String?           @map("signer_name")          /// Họ tên người ký
-  signerPosition     String?           @map("signer_position")      /// Chức vụ người ký
-  draftUnitId        String?           @map("draft_unit_id")        /// Đơn vị chủ trì soạn thảo
+  signerName     String? @map("signer_name") /// Họ tên người ký
+  signerPosition String? @map("signer_position") /// Chức vụ người ký
+  draftUnitId    String? @map("draft_unit_id") /// Đơn vị chủ trì soạn thảo
 
   // Phân loại
-  documentTypeId     String            @map("document_type_id")
-  urgency            UrgencyLevel      @default(NORMAL)
-  security           SecurityLevel     @default(NORMAL)
-  fieldId            String?           @map("field_id")
+  documentTypeId String        @map("document_type_id")
+  urgency        UrgencyLevel  @default(NORMAL)
+  security       SecurityLevel @default(NORMAL)
+  fieldId        String?       @map("field_id")
 
   // Thông tin nơi nhận ngoài & hình thức gửi
-  recipientsSummary  String?           @map("recipients_summary")   /// Tóm tắt nơi nhận
-  sendType           String?           @map("send_type")            /// Bưu điện, Trực tiếp, Email, Cổng thông tin
+  recipientsSummary String? @map("recipients_summary") /// Tóm tắt nơi nhận
+  sendType          String? @map("send_type") /// Bưu điện, Trực tiếp, Email, Cổng thông tin
 
   // Quản lý khóa & lý do
-  isLocked           Boolean           @default(false) @map("is_locked") /// Khóa file và nội dung khi đã ISSUED
-  cancellationReason String?           @map("cancellation_reason")       /// Lý do hủy/thu hồi/thay thế
-  summaryNotes       String?           @map("summary_notes")             /// Ghi chú tóm tắt
+  isLocked           Boolean @default(false) @map("is_locked") /// Khóa file và nội dung khi đã ISSUED
+  cancellationReason String? @map("cancellation_reason") /// Lý do hủy/thu hồi/thay thế
+  summaryNotes       String? @map("summary_notes") /// Ghi chú tóm tắt
 
   // Người tạo & Thời gian
-  creatorId          String            @map("creator_id")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
+  creatorId String   @map("creator_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workflow IncomingWorkflow?
 
   // Relations
-  documentBook       DocumentBook?          @relation(fields: [documentBookId], references: [id])
-  documentType       DocumentType           @relation(fields: [documentTypeId], references: [id])
-  field              Field?                 @relation(fields: [fieldId], references: [id])
-  senderOrg          ExternalOrganization?  @relation(fields: [senderOrgId], references: [id])
-  draftUnit          Unit?                  @relation("DraftUnit", fields: [draftUnitId], references: [id])
-  creator            User                   @relation("DocumentCreator", fields: [creatorId], references: [id])
+  documentBook DocumentBook?         @relation(fields: [documentBookId], references: [id])
+  documentType DocumentType          @relation(fields: [documentTypeId], references: [id])
+  field        Field?                @relation(fields: [fieldId], references: [id])
+  senderOrg    ExternalOrganization? @relation(fields: [senderOrgId], references: [id])
+  draftUnit    Unit?                 @relation("DraftUnit", fields: [draftUnitId], references: [id])
+  creator      User                  @relation("DocumentCreator", fields: [creatorId], references: [id])
 
-  handlers           DocumentHandler[]
-  approvals          DocumentApproval[]
-  files              DocumentFile[]
-  signatures         DocumentSignature[]
-  sourceRelations    DocumentRelation[]     @relation("SourceDoc")
-  targetRelations    DocumentRelation[]     @relation("TargetDoc")
-  readers            DocumentReader[]
-  archives           ArchiveDocument[]
-  notifications      Notification[]
+  handlers        DocumentHandler[]
+  approvals       DocumentApproval[]
+  files           DocumentFile[]
+  signatures      DocumentSignature[]
+  sourceRelations DocumentRelation[]  @relation("SourceDoc")
+  targetRelations DocumentRelation[]  @relation("TargetDoc")
+  readers         DocumentReader[]
+  archives        ArchiveDocument[]
+  notifications   Notification[]
 
   // Lớp bảo vệ cuối cùng: Duy nhất bộ ba (Sổ, Năm, Số thứ tự) để không trùng số
   @@unique([documentBookId, documentNumberYear, documentOrder])
@@ -439,35 +448,35 @@ model Document {
 
 /// Vai trò của người/đơn vị trong quá trình xử lý văn bản đến
 enum HandlerRole {
-  MAIN       /// Chủ trì xử lý (Bắt buộc hoàn thành mới được kết thúc văn bản)
+  MAIN /// Chủ trì xử lý (Bắt buộc hoàn thành mới được kết thúc văn bản)
   COORDINATE /// Phối hợp xử lý
-  INFO       /// Nhận để biết / theo dõi
+  INFO /// Nhận để biết / theo dõi
 }
 
 /// Trạng thái tiến độ xử lý của từng Handler
 enum HandlerStatus {
-  ASSIGNED   /// Đã giao
+  ASSIGNED /// Đã giao
   PROCESSING /// Đang xử lý
-  REPORTED   /// Đã nộp báo cáo kết quả
-  CONFIRMED  /// Trưởng phòng/Lãnh đạo đã duyệt hoàn thành
-  RETURNED   /// Bị trả lại yêu cầu làm lại
+  REPORTED /// Đã nộp báo cáo kết quả
+  CONFIRMED /// Trưởng phòng/Lãnh đạo đã duyệt hoàn thành
+  RETURNED /// Bị trả lại yêu cầu làm lại
 }
 
 /// Phân công xử lý văn bản đến cho đơn vị / cá nhân
 model DocumentHandler {
   id            String        @id @default(cuid())
   documentId    String        @map("document_id")
-  unitId        String?       @map("unit_id")     /// Đơn vị thụ lý
+  unitId        String?       @map("unit_id") /// Đơn vị thụ lý
   assignerId    String        @map("assigner_id") /// Người giao (Lãnh đạo hoặc Trưởng phòng)
   assigneeId    String        @map("assignee_id") /// Người nhận phân công (Trưởng phòng hoặc Chuyên viên)
   role          HandlerRole   @default(MAIN)
   status        HandlerStatus @default(ASSIGNED)
   assignedAt    DateTime      @default(now()) @map("assigned_at")
-  deadline      DateTime?                         /// Hạn xử lý cá nhân
+  deadline      DateTime? /// Hạn xử lý cá nhân
   completedAt   DateTime?     @map("completed_at")
-  readAt        DateTime?     @map("read_at")     /// Đã đọc vào lúc nào
+  readAt        DateTime?     @map("read_at") /// Đã đọc vào lúc nào
   reportContent String?       @map("report_content") /// Báo cáo kết quả xử lý
-  instruction   String?       /// Ý kiến chỉ đạo / Bút phê giao việc
+  instruction   String? /// Ý kiến chỉ đạo / Bút phê giao việc
 
   // Relations
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -495,9 +504,9 @@ enum ApprovalRole {
 
 /// Trạng thái bước duyệt
 enum ApprovalStatus {
-  PENDING     /// Chờ duyệt
-  APPROVED    /// Đã đồng ý duyệt
-  REJECTED    /// Trả lại / Không duyệt
+  PENDING /// Chờ duyệt
+  APPROVED /// Đã đồng ý duyệt
+  REJECTED /// Trả lại / Không duyệt
   TRANSFERRED /// Chuyển tiếp bước tiếp theo
 }
 
@@ -505,12 +514,12 @@ enum ApprovalStatus {
 model DocumentApproval {
   id         String         @id @default(cuid())
   documentId String         @map("document_id")
-  stepOrder  Int            @map("step_order")  /// 1: Trưởng phòng, 2: Lãnh đạo...
+  stepOrder  Int            @map("step_order") /// 1: Trưởng phòng, 2: Lãnh đạo...
   approverId String         @map("approver_id") /// Người duyệt
   role       ApprovalRole   @default(REVIEWER)
   status     ApprovalStatus @default(PENDING)
-  comment    String?                            /// Ý kiến duyệt hoặc lý do trả lại
-  actionAt   DateTime?      @map("action_at")   /// Thời điểm thực hiện hành động
+  comment    String? /// Ý kiến duyệt hoặc lý do trả lại
+  actionAt   DateTime?      @map("action_at") /// Thời điểm thực hiện hành động
   createdAt  DateTime       @default(now()) @map("created_at")
 
   // Relations
@@ -529,27 +538,27 @@ model DocumentApproval {
 // ============================================================================
 
 enum DocumentFileType {
-  DRAFT      /// Bản thảo
-  FINAL      /// Bản chính / hoàn chỉnh
+  DRAFT /// Bản thảo
+  FINAL /// Bản chính / hoàn chỉnh
   ATTACHMENT /// Phụ lục đính kèm
-  SCAN       /// Bản scan văn bản giấy có dấu/chữ ký
-  SIGNED     /// Bản đã phê duyệt điện tử
+  SCAN /// Bản scan văn bản giấy có dấu/chữ ký
+  SIGNED /// Bản đã phê duyệt điện tử
 }
 
 /// Quản lý file đính kèm và lịch sử phiên bản file (v1, v2...)
 model DocumentFile {
-  id          String           @id @default(cuid())
-  documentId  String           @map("document_id")
-  fileName    String           @map("file_name") /// Tên hiển thị (đã chuẩn hóa an toàn)
-  fileKey     String           @map("file_key")  /// Đường dẫn lưu disk qua StorageProvider
-  fileSize    Int              @map("file_size") /// Kích thước file (bytes)
-  mimeType    String           @map("mime_type") /// MIME thực của file
-  fileHash    String           @map("file_hash") /// SHA-256 hash của nội dung file
-  version     Int              @default(1)       /// Phiên bản: 1, 2, 3...
-  fileType    DocumentFileType @default(ATTACHMENT) @map("file_type")
-  isCurrent   Boolean          @default(true) @map("is_current") /// Phiên bản mới nhất
-  uploaderId  String           @map("uploader_id")
-  createdAt   DateTime         @default(now()) @map("created_at")
+  id         String           @id @default(cuid())
+  documentId String           @map("document_id")
+  fileName   String           @map("file_name") /// Tên hiển thị (đã chuẩn hóa an toàn)
+  fileKey    String           @map("file_key") /// Đường dẫn lưu disk qua StorageProvider
+  fileSize   Int              @map("file_size") /// Kích thước file (bytes)
+  mimeType   String           @map("mime_type") /// MIME thực của file
+  fileHash   String           @map("file_hash") /// SHA-256 hash của nội dung file
+  version    Int              @default(1) /// Phiên bản: 1, 2, 3...
+  fileType   DocumentFileType @default(ATTACHMENT) @map("file_type")
+  isCurrent  Boolean          @default(true) @map("is_current") /// Phiên bản mới nhất
+  uploaderId String           @map("uploader_id")
+  createdAt  DateTime         @default(now()) @map("created_at")
 
   // Relations
   document   Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -565,7 +574,7 @@ model DocumentFile {
 /// Hình thức ký số
 enum SignatureType {
   ELECTRONIC_APPROVAL /// Phê duyệt điện tử (Lưu thời điểm, người duyệt, SHA-256)
-  CA_TOKEN            /// USB Token / Chữ ký số CA (mở rộng trong tương lai)
+  CA_TOKEN /// USB Token / Chữ ký số CA (mở rộng trong tương lai)
 }
 
 /// Phê duyệt điện tử / Chữ ký số
@@ -596,8 +605,8 @@ model DocumentSignature {
 
 enum DocumentRelationType {
   REPLY_TO /// Trả lời cho văn bản
-  REPLACE  /// Thay thế cho văn bản
-  RELATED  /// Liên quan
+  REPLACE /// Thay thế cho văn bản
+  RELATED /// Liên quan
 }
 
 /// Liên kết giữa các văn bản
@@ -643,11 +652,11 @@ model DocumentReader {
 model Archive {
   id              String    @id @default(cuid())
   code            String    @unique /// Mã hồ sơ (VD: HS-2026-001)
-  title           String    /// Tiêu đề hồ sơ
-  year            Int       /// Năm hồ sơ
+  title           String /// Tiêu đề hồ sơ
+  year            Int /// Năm hồ sơ
   retentionPeriod String    @map("retention_period") /// 5 năm, 10 năm, Vĩnh viễn
-  unitId          String    @map("unit_id")          /// Đơn vị lập hồ sơ
-  creatorId       String    @map("creator_id")       /// Chuyên viên lập hồ sơ
+  unitId          String    @map("unit_id") /// Đơn vị lập hồ sơ
+  creatorId       String    @map("creator_id") /// Chuyên viên lập hồ sơ
   isClosed        Boolean   @default(false) @map("is_closed") /// Khi đã đóng, không thêm văn bản mới
   closedAt        DateTime? @map("closed_at")
   description     String?
@@ -690,12 +699,12 @@ model ArchiveDocument {
 model AuditLog {
   id        String   @id @default(cuid())
   actorId   String   @map("actor_id")
-  action    String   /// DOC_CREATE, DOC_TRANSITION, DOC_NUMBER, DOC_ISSUE, DOC_RECALL...
+  action    String /// DOC_CREATE, DOC_TRANSITION, DOC_NUMBER, DOC_ISSUE, DOC_RECALL...
   tableName String   @map("table_name") /// "documents", "document_files"...
-  recordId  String   @map("record_id")  /// ID của record bị tác động
-  oldState  Json?    @map("old_state")  /// Snapshot trạng thái cũ
-  newState  Json?    @map("new_state")  /// Snapshot trạng thái mới
-  reason    String?  /// Lý do chuyển trạng thái / lý do trả lại / ghi chú
+  recordId  String   @map("record_id") /// ID của record bị tác động
+  oldState  Json?    @map("old_state") /// Snapshot trạng thái cũ
+  newState  Json?    @map("new_state") /// Snapshot trạng thái mới
+  reason    String? /// Lý do chuyển trạng thái / lý do trả lại / ghi chú
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
   createdAt DateTime @default(now()) @map("created_at")
@@ -713,22 +722,22 @@ model AuditLog {
 // ============================================================================
 
 enum NotificationType {
-  DOC_ASSIGNED         /// Được giao xử lý văn bản đến
-  DOC_RETURNED         /// Văn bản hoặc kết quả xử lý bị trả lại
+  DOC_ASSIGNED /// Được giao xử lý văn bản đến
+  DOC_RETURNED /// Văn bản hoặc kết quả xử lý bị trả lại
   DOC_APPROVAL_REQUEST /// Đến lượt duyệt văn bản đi
   DOC_DEADLINE_WARNING /// Cảnh báo sắp đến hạn xử lý
-  DOC_COMPLETED        /// Văn bản đã hoàn thành / phát hành
+  DOC_COMPLETED /// Văn bản đã hoàn thành / phát hành
 }
 
 /// Thông báo nội bộ hệ thống
 model Notification {
   id          String           @id @default(cuid())
   recipientId String           @map("recipient_id") /// Người nhận thông báo
-  actorId     String           @map("actor_id")     /// Người gây ra hành động
+  actorId     String           @map("actor_id") /// Người gây ra hành động
   type        NotificationType
   title       String
   content     String
-  documentId  String?          @map("document_id")  /// Link tới văn bản liên quan
+  documentId  String?          @map("document_id") /// Link tới văn bản liên quan
   isRead      Boolean          @default(false) @map("is_read")
   readAt      DateTime?        @map("read_at")
   createdAt   DateTime         @default(now()) @map("created_at")
@@ -741,4 +750,46 @@ model Notification {
   @@index([recipientId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+/// Người nhận và thông tin luân chuyển của văn bản đến.
+model IncomingWorkflow {
+  documentId     String   @id @map("document_id")
+  leaderId       String?  @map("leader_id")
+  headId         String?  @map("head_id")
+  unitId         String?  @map("unit_id")
+  registrarId    String?  @map("registrar_id")
+  instruction    String?
+  trackingCode   String?  @unique @map("tracking_code")
+  senderPhone    String?  @map("sender_phone")
+  senderEmail    String?  @map("sender_email")
+  senderAddress  String?  @map("sender_address")
+  submissionType String?  @map("submission_type")
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  leader         User?    @relation("IncomingLeader", fields: [leaderId], references: [id])
+  head           User?    @relation("IncomingHead", fields: [headId], references: [id])
+  registrar      User?    @relation("IncomingRegistrar", fields: [registrarId], references: [id])
+  unit           Unit?    @relation(fields: [unitId], references: [id])
+
+  @@index([leaderId])
+  @@index([headId])
+  @@index([unitId])
+  @@map("incoming_workflows")
+}
+
+/// Tệp đã tải lên chờ gắn vào hồ sơ, có chủ sở hữu và hạn sử dụng.
+model PendingUpload {
+  id         String    @id @default(cuid())
+  uploaderId String    @map("uploader_id")
+  fileKey    String    @map("file_key")
+  fileName   String    @map("file_name")
+  mimeType   String    @map("mime_type")
+  fileSize   Int       @map("file_size")
+  fileHash   String    @map("file_hash")
+  expiresAt  DateTime  @map("expires_at")
+  claimedAt  DateTime? @map("claimed_at")
+  uploader   User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([uploaderId, fileKey])
+  @@map("pending_uploads")
 }

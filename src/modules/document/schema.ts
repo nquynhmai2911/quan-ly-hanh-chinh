@@ -12,18 +12,40 @@ export const createIncomingDocumentSchema = z.object({
   documentBookId: z.string().min(1, "Bắt buộc chọn sổ văn bản đến"),
   documentTypeId: z.string().min(1, "Bắt buộc chọn loại văn bản"),
   originalCode: z.string().max(100).optional().nullable(), // Số/ký hiệu gốc của cơ quan gửi
-  senderOrgId: z.string().optional().nullable(),           // Chọn từ danh mục cơ quan bên ngoài
-  senderName: z.string().max(255).optional().nullable(),   // Nhập tay nếu ngoài danh mục
+  senderOrgId: z.string().optional().nullable(), // Chọn từ danh mục cơ quan bên ngoài
+  senderName: z.string().max(255).optional().nullable(), // Nhập tay nếu ngoài danh mục
   issuedDate: z.coerce.date({ message: "Ngày trên văn bản không hợp lệ" }),
   receivedDate: z.coerce.date().default(() => new Date()),
   processingDeadline: z.coerce.date().optional().nullable(),
   urgency: z.enum(["NORMAL", "URGENT", "FIRE"]).default("NORMAL"),
-  security: z.enum(["NORMAL", "CONFIDENTIAL", "SECRET", "TOP_SECRET"]).default("NORMAL"),
+  security: z
+    .enum(["NORMAL", "CONFIDENTIAL", "SECRET", "TOP_SECRET"])
+    .default("NORMAL"),
   fieldId: z.string().optional().nullable(),
   summaryNotes: z.string().max(1000).optional().nullable(),
 });
 
-export type CreateIncomingDocumentFormData = z.infer<typeof createIncomingDocumentSchema>;
+export type CreateIncomingDocumentFormData = z.infer<
+  typeof createIncomingDocumentSchema
+>;
+
+// Metadata returned by /api/upload, retained when registering the document.
+export const incomingDocumentSubmissionSchema =
+  createIncomingDocumentSchema.extend({
+    attachment: z
+      .object({
+        uploadId: z.string().optional(),
+        fileKey: z
+          .string()
+          .min(1)
+          .regex(/^[a-zA-Z0-9_.-]+$/),
+        fileName: z.string().min(1),
+        fileHash: z.string().regex(/^[a-f0-9]{64}$/),
+        fileSize: z.number().int().nonnegative(),
+        mimeType: z.string().min(1),
+      })
+      .optional(),
+  });
 
 // ── 2. Tạo dự thảo văn bản đi / Tờ trình ─────────────────────────────────
 export const createOutgoingDraftSchema = z.object({
@@ -35,7 +57,9 @@ export const createOutgoingDraftSchema = z.object({
   draftUnitId: z.string().min(1, "Bắt buộc chọn đơn vị chủ trì soạn thảo"),
   documentBookId: z.string().optional().nullable(), // Có thể chọn sổ trước hoặc khi cấp số
   urgency: z.enum(["NORMAL", "URGENT", "FIRE"]).default("NORMAL"),
-  security: z.enum(["NORMAL", "CONFIDENTIAL", "SECRET", "TOP_SECRET"]).default("NORMAL"),
+  security: z
+    .enum(["NORMAL", "CONFIDENTIAL", "SECRET", "TOP_SECRET"])
+    .default("NORMAL"),
   fieldId: z.string().optional().nullable(),
   signerName: z.string().max(100).optional().nullable(),
   signerPosition: z.string().max(100).optional().nullable(),
@@ -44,7 +68,9 @@ export const createOutgoingDraftSchema = z.object({
   summaryNotes: z.string().max(1000).optional().nullable(),
 });
 
-export type CreateOutgoingDraftFormData = z.infer<typeof createOutgoingDraftSchema>;
+export type CreateOutgoingDraftFormData = z.infer<
+  typeof createOutgoingDraftSchema
+>;
 
 // ── 3. Phân công xử lý văn bản đến ───────────────────────────────────────
 export const assignHandlerSchema = z.object({
@@ -59,12 +85,12 @@ export const assignHandlerSchema = z.object({
         }),
         deadline: z.coerce.date().optional().nullable(),
         instruction: z.string().max(500).optional().nullable(),
-      })
+      }),
     )
     .min(1, "Bắt buộc phân công cho ít nhất một người xử lý")
     .refine(
       (handlers) => handlers.filter((h) => h.role === "MAIN").length === 1,
-      { message: "Bắt buộc phải có đúng một người chủ trì (MAIN)" }
+      { message: "Bắt buộc phải có đúng một người chủ trì (MAIN)" },
     ),
 });
 
@@ -92,6 +118,7 @@ export type AnnotateDocumentFormData = z.infer<typeof annotateDocumentSchema>;
 export const transitionDocumentSchema = z.object({
   documentId: z.string().min(1),
   action: z.enum([
+    "RECEIVE_CITIZEN",
     "SUBMIT_LEADER",
     "LEADER_ANNOTATE",
     "RETURN_CLERK",
@@ -114,6 +141,13 @@ export const transitionDocumentSchema = z.object({
     "CANCEL",
   ]),
   reason: z.string().max(1000).optional(),
+  leaderId: z.string().min(1).optional(),
+  headId: z.string().min(1).optional(),
+  unitId: z.string().min(1).optional(),
+  documentBookId: z.string().min(1).optional(),
+  processingDeadline: z.coerce.date().optional().nullable(),
 });
 
-export type TransitionDocumentFormData = z.infer<typeof transitionDocumentSchema>;
+export type TransitionDocumentFormData = z.infer<
+  typeof transitionDocumentSchema
+>;

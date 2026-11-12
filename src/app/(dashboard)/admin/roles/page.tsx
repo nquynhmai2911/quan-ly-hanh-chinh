@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Save, CheckSquare, Square } from "lucide-react";
+import { Save, CheckSquare, Square } from "lucide-react";
 import { toast } from "sonner";
 
 interface RoleItem {
@@ -66,6 +66,7 @@ export default function AdminRolesPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRolesAndPermissions();
   }, []);
 

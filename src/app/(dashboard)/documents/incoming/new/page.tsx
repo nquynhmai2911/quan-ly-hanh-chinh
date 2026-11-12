@@ -5,22 +5,36 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createIncomingDocumentSchema, CreateIncomingDocumentFormData } from "@/modules/document/schema";
+import {
+  createIncomingDocumentSchema,
+  CreateIncomingDocumentFormData,
+} from "@/modules/document/schema";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { FileText, UploadCloud, ArrowLeft, Building2, Calendar, Shield, Flame } from "lucide-react";
+import {
+  FileText,
+  UploadCloud,
+  ArrowLeft,
+  Building2,
+  Calendar,
+  Shield,
+  Flame,
+} from "lucide-react";
 
 export default function NewIncomingDocumentPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [books, setBooks] = useState<Array<{ id: string; name: string; code: string }>>([
-    { id: "book-den", name: "Sổ văn bản đến chung", code: "SVB-DEN" },
-    { id: "book-khan", name: "Sổ văn bản đến khẩn / hỏa tốc", code: "SVB-KHAN" },
-  ]);
-  const [docTypes, setDocTypes] = useState<Array<{ id: string; name: string; code: string }>>([]);
-  const [externalOrgs, setExternalOrgs] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [books, setBooks] = useState<
+    Array<{ id: string; name: string; code: string }>
+  >([]);
+  const [docTypes, setDocTypes] = useState<
+    Array<{ id: string; name: string; code: string }>
+  >([]);
+  const [externalOrgs, setExternalOrgs] = useState<
+    Array<{ id: string; name: string; code: string }>
+  >([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const {
@@ -29,9 +43,9 @@ export default function NewIncomingDocumentPage() {
     setValue,
     formState: { errors },
   } = useForm<CreateIncomingDocumentFormData>({
-    resolver: zodResolver(createIncomingDocumentSchema) as any,
+    resolver: zodResolver(createIncomingDocumentSchema) as unknown as Resolver<CreateIncomingDocumentFormData>,
     defaultValues: {
-      documentBookId: "book-den",
+      documentBookId: "",
       documentTypeId: "CV",
       urgency: "NORMAL",
       security: "NORMAL",
@@ -42,21 +56,17 @@ export default function NewIncomingDocumentPage() {
 
   useEffect(() => {
     // Tải danh mục sổ văn bản đến
-    fetch("/api/admin/books")
+    fetch("/api/documents/routing-options")
       .then((r) => r.json())
       .then((j) => {
-        if (j.success && j.data.length > 0) {
-          const incoming = j.data.filter((b: { bookType: string }) => b.bookType === "INCOMING");
+        if (j.success && j.data.books.length > 0) {
+          const incoming = j.data.books;
           if (incoming.length > 0) {
             setBooks(incoming);
             setValue("documentBookId", incoming[0].id);
           }
         }
       })
-      .catch(() => {});
-
-    // Tải loại văn bản
-    fetch("/api/admin/units") // Có thể tải catalog
       .catch(() => {});
   }, [setValue]);
 
@@ -75,7 +85,7 @@ export default function NewIncomingDocumentPage() {
         });
         const uploadJson = await uploadRes.json();
         if (!uploadRes.ok || !uploadJson.success) {
-          toast.error(uploadJson.error?.message || "Lỗi khi tải file đính kèm.");
+          toast.error(uploadJson.error?.message || "Lỗi khi tải tệp đính kèm.");
           return;
         }
         uploadedFileKey = uploadJson.data;
@@ -87,11 +97,7 @@ export default function NewIncomingDocumentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
-          fileKey: uploadedFileKey?.fileKey,
-          fileName: uploadedFileKey?.fileName,
-          fileHash: uploadedFileKey?.fileHash,
-          fileSize: uploadedFileKey?.fileSize,
-          mimeType: uploadedFileKey?.mimeType,
+          attachment: uploadedFileKey || undefined,
         }),
       });
 
@@ -101,7 +107,9 @@ export default function NewIncomingDocumentPage() {
         return;
       }
 
-      toast.success(`Đã vào sổ thành công! Số đến: ${json.data.documentNumber}`);
+      toast.success(
+        `Đã vào sổ thành công! Số đến: ${json.data.documentNumber}`,
+      );
       router.push(`/documents/${json.data.id}`);
       router.refresh();
     } catch {
@@ -120,9 +128,12 @@ export default function NewIncomingDocumentPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Tiếp nhận & Vào sổ Văn bản đến</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Tiếp nhận & Vào sổ Văn bản đến
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Đăng ký văn bản vào sổ, cấp số đến và chuẩn bị trình Lãnh đạo cho ý kiến chỉ đạo
+              Đăng ký văn bản vào sổ, cấp số đến và chuẩn bị trình Lãnh đạo cho
+              ý kiến chỉ đạo
             </p>
           </div>
         </div>
@@ -137,7 +148,9 @@ export default function NewIncomingDocumentPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Sổ văn bản đến *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Sổ văn bản đến *
+              </label>
               <select
                 {...register("documentBookId")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -148,11 +161,17 @@ export default function NewIncomingDocumentPage() {
                   </option>
                 ))}
               </select>
-              {errors.documentBookId && <p className="text-xs text-rose-500 mt-1">{errors.documentBookId.message}</p>}
+              {errors.documentBookId && (
+                <p className="text-xs text-rose-500 mt-1">
+                  {errors.documentBookId.message}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Loại văn bản *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Loại văn bản *
+              </label>
               <select
                 {...register("documentTypeId")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -168,7 +187,9 @@ export default function NewIncomingDocumentPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Số/Ký hiệu gốc trên văn bản</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Số/Ký hiệu gốc trên văn bản
+              </label>
               <input
                 type="text"
                 {...register("originalCode")}
@@ -178,7 +199,9 @@ export default function NewIncomingDocumentPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Cơ quan / Đơn vị gửi văn bản</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Cơ quan / Đơn vị gửi văn bản
+              </label>
               <input
                 type="text"
                 {...register("senderName")}
@@ -188,28 +211,38 @@ export default function NewIncomingDocumentPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày ban hành trên văn bản *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Ngày ban hành trên văn bản *
+              </label>
               <input
                 type="date"
                 required
                 defaultValue={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setValue("issuedDate", new Date(e.target.value))}
+                onChange={(e) =>
+                  setValue("issuedDate", new Date(e.target.value))
+                }
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày đến cơ quan</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Ngày đến cơ quan
+              </label>
               <input
                 type="date"
                 defaultValue={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setValue("receivedDate", new Date(e.target.value))}
+                onChange={(e) =>
+                  setValue("receivedDate", new Date(e.target.value))
+                }
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Độ khẩn</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Độ khẩn
+              </label>
               <select
                 {...register("urgency")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -221,7 +254,9 @@ export default function NewIncomingDocumentPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Độ mật</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Độ mật
+              </label>
               <select
                 {...register("security")}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
@@ -234,17 +269,26 @@ export default function NewIncomingDocumentPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Hạn xử lý (nếu có)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Hạn xử lý (nếu có)
+              </label>
               <input
                 type="date"
-                onChange={(e) => setValue("processingDeadline", e.target.value ? new Date(e.target.value) : null)}
+                onChange={(e) =>
+                  setValue(
+                    "processingDeadline",
+                    e.target.value ? new Date(e.target.value) : null,
+                  )
+                }
                 className="w-full md:w-1/2 px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Trích yếu nội dung văn bản *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Trích yếu nội dung văn bản *
+            </label>
             <textarea
               rows={3}
               required
@@ -252,7 +296,11 @@ export default function NewIncomingDocumentPage() {
               placeholder="VD: V/v hướng dẫn công tác văn thư lưu trữ và quản lý văn bản điện tử năm 2026..."
               className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
             />
-            {errors.title && <p className="text-xs text-rose-500 mt-1">{errors.title.message}</p>}
+            {errors.title && (
+              <p className="text-xs text-rose-500 mt-1">
+                {errors.title.message}
+              </p>
+            )}
           </div>
         </div>
 
@@ -271,10 +319,15 @@ export default function NewIncomingDocumentPage() {
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               className="hidden"
             />
-            <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
+            <label
+              htmlFor="file-upload"
+              className="cursor-pointer flex flex-col items-center"
+            >
               <UploadCloud className="h-8 w-8 text-slate-400 mb-2" />
               <span className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-                {selectedFile ? selectedFile.name : "Nhấp vào đây để chọn file đính kèm"}
+                {selectedFile
+                  ? selectedFile.name
+                  : "Nhấp vào đây để chọn tệp đính kèm"}
               </span>
               <span className="text-xs text-slate-500 mt-1">
                 Hỗ trợ PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (Tối đa 25MB)
@@ -293,7 +346,12 @@ export default function NewIncomingDocumentPage() {
           <Button variant="outline" type="button" onClick={() => router.back()}>
             Hủy bỏ
           </Button>
-          <Button type="submit" isLoading={isLoading} className="gap-2">
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            disabled={!books.length}
+            className="gap-2"
+          >
             <FileText className="h-4 w-4" />
             Vào sổ & Cấp số đến
           </Button>

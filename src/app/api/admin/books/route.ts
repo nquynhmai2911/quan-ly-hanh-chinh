@@ -12,7 +12,7 @@ import { BookType } from "@prisma/client";
 
 export async function GET() {
   try {
-    await requirePermission(Permissions.CATALOG_MANAGE);
+    await requirePermission(Permissions.CATALOG_VIEW);
 
     const currentYear = new Date().getFullYear();
 
@@ -31,36 +31,7 @@ export async function GET() {
 
     return successResponse(books);
   } catch (error) {
-    console.warn("[AdminBooks] Database offline, returning demo books:", (error as Error).message);
-    return successResponse([
-      {
-        id: "book-demo-01",
-        name: "Sổ văn bản đến chung",
-        code: "SVB-DEN",
-        bookType: "INCOMING",
-        numberTemplate: "{number}",
-        counters: [{ year: 2026, lastNumber: 128 }],
-        _count: { documents: 128 },
-      },
-      {
-        id: "book-demo-02",
-        name: "Sổ Công văn đi - TCHC",
-        code: "SCV-TCHC",
-        bookType: "OUTGOING",
-        numberTemplate: "{number}/{typeCode}-{unitCode}",
-        counters: [{ year: 2026, lastNumber: 45 }],
-        _count: { documents: 45 },
-      },
-      {
-        id: "book-demo-03",
-        name: "Sổ Quyết định",
-        code: "SQD",
-        bookType: "OUTGOING",
-        numberTemplate: "{number}/{typeCode}-{unitCode}",
-        counters: [{ year: 2026, lastNumber: 22 }],
-        _count: { documents: 22 },
-      },
-    ]);
+    return errorResponse(error);
   }
 }
 
@@ -72,10 +43,21 @@ export async function POST(request: NextRequest) {
     const parsed = documentBookSchema.safeParse(body);
 
     if (!parsed.success) {
-      throw new BusinessError("VALIDATION_ERROR", parsed.error.issues[0]?.message);
+      throw new BusinessError(
+        "VALIDATION_ERROR",
+        parsed.error.issues[0]?.message,
+      );
     }
 
-    const { name, code, bookType, unitId, documentTypeId, numberTemplate, description } = parsed.data;
+    const {
+      name,
+      code,
+      bookType,
+      unitId,
+      documentTypeId,
+      numberTemplate,
+      description,
+    } = parsed.data;
 
     const existing = await prisma.documentBook.findUnique({
       where: { code },

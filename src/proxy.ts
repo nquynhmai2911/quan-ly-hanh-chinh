@@ -1,5 +1,5 @@
-// src/middleware.ts
-// Middleware kiểm tra xác thực và chặn truy cập sớm ở tầng Edge
+// src/proxy.ts
+// Proxy (thay cho middleware.ts từ Next.js 16) kiểm tra xác thực và chặn truy cập sớm
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -8,11 +8,12 @@ import { jwtVerify } from "jose";
 const SESSION_COOKIE_NAME = "eoffice_session";
 
 function getSecretKey(): Uint8Array {
-  const secret = process.env.AUTH_SECRET || "fallback-secret-key-at-least-32-chars-long";
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("Chưa cấu hình khóa phiên đăng nhập.");
   return new TextEncoder().encode(secret);
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Bỏ qua tài nguyên tĩnh và Next.js internals
@@ -38,14 +39,17 @@ export async function middleware(request: NextRequest) {
 
   // 1. Trang Login
   if (pathname === "/login") {
-    if (isAuthenticated) {
+    if (isAuthenticated && !request.nextUrl.searchParams.has("reauth")) {
       return NextResponse.redirect(new URL("/documents/incoming", request.url));
     }
     return NextResponse.next();
   }
 
   // 2. Các API Authentication công khai
-  if (pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/logout")) {
+  if (
+    pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/api/auth/logout")
+  ) {
     return NextResponse.next();
   }
 
@@ -60,7 +64,7 @@ export async function middleware(request: NextRequest) {
             message: "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
     return NextResponse.next();
@@ -77,7 +81,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

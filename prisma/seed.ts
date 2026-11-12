@@ -497,7 +497,7 @@ async function main() {
       email: "nguoidan@eoffice.local",
       positionName: "Chuyên viên",
       unitCode: "CQ",
-      roleCode: "SPECIALIST",
+      roleCode: "CITIZEN",
       dataScope: DataScope.OWN,
     },
     {

@@ -143,14 +143,11 @@ export async function DELETE(
 
     const user = await prisma.user.findUnique({
       where: { id },
-      include: {
-        _count: {
-          select: {
-            createdDocuments: true,
-            assignedHandlers: true,
-            documentApprovals: true,
-          },
-        },
+      select: {
+        id: true,
+        employeeCode: true,
+        email: true,
+        fullName: true,
       },
     });
 
@@ -158,34 +155,117 @@ export async function DELETE(
       throw new BusinessError("NOT_FOUND", "Không tìm thấy người dùng.");
     }
 
-    // Nếu người dùng đã có phát sinh dữ liệu nghiệp vụ (văn bản, xử lý, duyệt), ta chỉ khóa tài khoản (Soft Delete / Deactivate)
+    if (user.employeeCode === "ADMIN001" || user.email === "admin@eoffice.local") {
+      throw new BusinessError("FORBIDDEN", "Không thể xóa tài khoản Quản trị viên hệ thống gốc.");
+    }
+
+    // Kiểm tra xem người dùng có phát sinh dữ liệu nghiệp vụ quan trọng (văn bản, xử lý, duyệt, ký số, hồ sơ lưu trữ) hay không
+    const [
+      createdDocs,
+      assignedHandlers,
+      assignedByHandlers,
+      documentApprovals,
+      signatures,
+      createdArchives,
+      incomingLed,
+      incomingManaged,
+      incomingRegistered,
+      auditLogs,
+    ] = await Promise.all([
+      prisma.document.count({ where: { creatorId: id } }),
+      prisma.documentHandler.count({ where: { assigneeId: id } }),
+      prisma.documentHandler.count({ where: { assignerId: id } }),
+      prisma.documentApproval.count({ where: { approverId: id } }),
+      prisma.documentSignature.count({ where: { signerId: id } }),
+      prisma.archive.count({ where: { creatorId: id } }),
+      prisma.incomingWorkflow.count({ where: { leaderId: id } }),
+      prisma.incomingWorkflow.count({ where: { headId: id } }),
+      prisma.incomingWorkflow.count({ where: { registrarId: id } }),
+      prisma.auditLog.count({ where: { actorId: id } }),
+    ]);
+
     const hasData =
-      user._count.createdDocuments > 0 ||
-      user._count.assignedHandlers > 0 ||
-      user._count.documentApprovals > 0;
+      createdDocs > 0 ||
+      assignedHandlers > 0 ||
+      assignedByHandlers > 0 ||
+      documentApprovals > 0 ||
+      signatures > 0 ||
+      createdArchives > 0 ||
+      incomingLed > 0 ||
+      incomingManaged > 0 ||
+      incomingRegistered > 0 ||
+      auditLogs > 0;
 
     if (hasData) {
+      // Vô hiệu hóa an toàn (Soft delete) để bảo toàn tính toàn vẹn dữ liệu
       await prisma.user.update({
         where: { id },
         data: { isActive: false },
       });
       invalidateAuthContext(id);
       return successResponse({
-        message: "Tài khoản đã được vô hiệu hóa/khóa an toàn do có liên kết hồ sơ văn bản.",
+        message: "Tài khoản đã được vô hiệu hóa / khóa an toàn do có liên kết hồ sơ văn bản lịch sử.",
         deactivated: true,
       });
     }
 
-    // Nếu là tài khoản mới chưa phát sinh dữ liệu, xóa hẳn
-    await prisma.user.delete({
-      where: { id },
-    });
-    invalidateAuthContext(id);
+    // Nếu tài khoản chưa phát sinh dữ liệu văn bản nghiệp vụ, xóa sạch toàn bộ các bản ghi phụ thuộc trong transaction
+    try {
+      await prisma.$transaction(async (tx) => {
+        // 1. Xóa phân quyền trực tiếp
+        await tx.userPermission.deleteMany({
+          where: { userId: id },
+        });
 
-    return successResponse({
-      message: "Đã xóa tài khoản người dùng thành công.",
-      deleted: true,
-    });
+        // 2. Xóa các vai trò gắn với vị trí chức danh của người dùng
+        await tx.userPositionRole.deleteMany({
+          where: { userPosition: { userId: id } },
+        });
+
+        // 3. Xóa các vị trí chức danh công tác
+        await tx.userPosition.deleteMany({
+          where: { userId: id },
+        });
+
+        // 4. Xóa thông báo liên quan
+        await tx.notification.deleteMany({
+          where: { OR: [{ recipientId: id }, { actorId: id }] },
+        });
+
+        // 5. Xóa lịch sử đã đọc văn bản
+        await tx.documentReader.deleteMany({
+          where: { userId: id },
+        });
+
+        // 6. Xóa các tệp tải lên tạm
+        await tx.pendingUpload.deleteMany({
+          where: { uploaderId: id },
+        });
+
+        // 7. Xóa tài khoản người dùng
+        await tx.user.delete({
+          where: { id },
+        });
+      });
+
+      invalidateAuthContext(id);
+
+      return successResponse({
+        message: "Đã xóa hoàn toàn tài khoản người dùng thành công.",
+        deleted: true,
+      });
+    } catch (deleteError) {
+      console.warn("Không thể xóa cứng tài khoản do ràng buộc dữ liệu, tự động chuyển sang khóa tài khoản an toàn:", deleteError);
+      await prisma.user.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      invalidateAuthContext(id);
+      return successResponse({
+        message: "Tài khoản đã được vô hiệu hóa / khóa an toàn do có ràng buộc dữ liệu hệ thống.",
+        deactivated: true,
+      });
+    }
   } catch (error) {
     return errorResponse(error);
   }

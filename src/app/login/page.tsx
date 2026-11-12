@@ -74,9 +74,6 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold tracking-tight text-white">
           Quản lý hành chính
         </h2>
-        <p className="mt-1 text-xs text-slate-400">
-          Hệ thống Quản lý Văn bản Hành chính theo Nghị định 30/2020/NĐ-CP
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">

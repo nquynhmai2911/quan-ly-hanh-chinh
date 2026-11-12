@@ -159,6 +159,9 @@ export default function DocumentDetailPage({
       const json = await res.json();
       if (json.success) {
         setDocData(json.data.document);
+        if (!json.data.document.files || json.data.document.files.length === 0) {
+          setPreviewMode("doc");
+        }
         setCanAssign(!!json.data.canAssign);
         setCanAttach(!!json.data.canAttach);
         setCanReport(!!json.data.canReport);
@@ -411,7 +414,7 @@ export default function DocumentDetailPage({
                 }`}
               >
                 <FileText className="h-3.5 w-3.5 text-indigo-600" />
-                Thông tin văn bản
+                Văn bản hành chính (NĐ 30)
               </button>
 
               <button
@@ -501,52 +504,293 @@ export default function DocumentDetailPage({
               )}
             </div>
           )}
-          {/* Vùng nội dung xem */}
+          {/* Vùng nội dung xem: Mẫu Văn bản Hành chính theo Nghị định 30/2020/NĐ-CP */}
           {previewMode === "doc" ? (
-            <div className="p-6 space-y-4 overflow-auto text-sm">
-              <h2 className="text-lg font-semibold">Thông tin văn bản</h2>
-              <p>
-                <strong>Trích yếu:</strong> {docData.title}
-              </p>
-              <p>
-                <strong>Nơi gửi:</strong>{" "}
-                {docData.senderName || "Chưa ghi nhận"}
-              </p>
-              <p>
-                <strong>Số văn bản:</strong>{" "}
-                {docData.documentNumber || "Chưa vào sổ"}
-              </p>
-              <p>
-                <strong>Lãnh đạo nhận trình:</strong>{" "}
-                {docData.workflow?.leader?.fullName || "Chưa trình"}
-              </p>
-              <p>
-                <strong>Phòng ban xử lý:</strong>{" "}
-                {docData.workflow?.unit?.name || "Chưa phân phối"}
-              </p>
-              <p>
-                <strong>Trưởng phòng phụ trách:</strong>{" "}
-                {docData.workflow?.head?.fullName || "Chưa phân phối"}
-              </p>
-              {docData.workflow?.instruction && (
-                <p className="whitespace-pre-wrap">
-                  <strong>Ý kiến chỉ đạo:</strong>{" "}
-                  {docData.workflow.instruction}
-                </p>
-              )}
-              {docData.summaryNotes && (
-                <p className="whitespace-pre-wrap">
-                  <strong>Ghi chú:</strong> {docData.summaryNotes}
-                </p>
-              )}
-              {docData.workflow?.trackingCode && (
-                <p>
-                  <strong>Mã tra cứu:</strong> {docData.workflow.trackingCode}
-                </p>
-              )}
-              <p className="text-slate-500">
-                Nội dung gốc nằm trong các tệp đính kèm.
-              </p>
+            <div className="flex-1 overflow-auto bg-slate-100/60 p-4 md:p-6 print:p-0 print:bg-white">
+              <div className="bg-white border border-slate-200 shadow-md rounded max-w-3xl mx-auto p-6 md:p-10 text-slate-900 font-serif leading-relaxed text-sm select-text print:border-none print:shadow-none print:max-w-full">
+                {/* 1. Phần Tiêu đề đầu trang (Header NĐ 30/2020/NĐ-CP) */}
+                <div className="grid grid-cols-2 gap-4 pb-6 border-b border-slate-200">
+                  {/* Góc trái: Cơ quan ban hành / tiếp nhận */}
+                  <div className="text-center font-sans">
+                    <p className="text-xs uppercase tracking-wide text-slate-600 font-medium">
+                      {docData.direction === "INCOMING"
+                        ? docData.senderOrg?.name || docData.senderName || "CƠ QUAN / ĐƠN VỊ TIẾP NHẬN"
+                        : "HỆ THỐNG QUẢN LÝ HÀNH CHÍNH"}
+                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-900 mt-0.5">
+                      {docData.workflow?.unit?.name || "BỘ PHẬN VĂN THƯ & ĐIỀU HÀNH"}
+                    </p>
+                    <div className="w-20 border-b border-slate-400 mx-auto my-1.5" />
+                    <p className="text-xs text-slate-700">
+                      <strong>Số:</strong> {docData.documentNumber || "....."}
+                      {docData.originalCode ? ` / ${docData.originalCode}` : " / VT"}
+                    </p>
+                    {docData.workflow?.trackingCode && (
+                      <p className="text-[11px] text-indigo-700 font-mono mt-0.5">
+                        Mã tra cứu: {docData.workflow.trackingCode}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Góc phải: Quốc hiệu, Tiêu ngữ, Ngày tháng năm */}
+                  <div className="text-center font-sans">
+                    <p className="text-xs md:text-sm font-bold uppercase tracking-tight text-slate-900">
+                      CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+                    </p>
+                    <p className="text-xs md:text-sm font-bold text-slate-800 underline decoration-1 underline-offset-4 mt-0.5">
+                      Độc lập - Tự do - Hạnh phúc
+                    </p>
+                    <div className="w-28 border-b-2 border-slate-800 mx-auto my-1.5" />
+                    <p className="text-xs italic text-slate-600 font-serif">
+                      Hà Nội, ngày{" "}
+                      {docData.issuedDate
+                        ? new Date(docData.issuedDate).getDate()
+                        : new Date().getDate()}{" "}
+                      tháng{" "}
+                      {docData.issuedDate
+                        ? new Date(docData.issuedDate).getMonth() + 1
+                        : new Date().getMonth() + 1}{" "}
+                      năm{" "}
+                      {docData.issuedDate
+                        ? new Date(docData.issuedDate).getFullYear()
+                        : new Date().getFullYear()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Tiêu đề văn bản (Chính giữa) */}
+                <div className="text-center py-6">
+                  <h1 className="text-lg md:text-xl font-bold uppercase tracking-wide text-slate-900 font-sans">
+                    {docData.documentType?.name
+                      ? docData.documentType.name.toUpperCase()
+                      : docData.direction === "INCOMING"
+                      ? "PHIẾU TRÌNH GIẢI QUYẾT VĂN BẢN ĐẾN"
+                      : "TỜ TRÌNH ĐỀ XUẤT"}
+                  </h1>
+                  <p className="mt-1.5 text-sm md:text-base italic text-slate-800 max-w-xl mx-auto font-medium">
+                    V/v: {docData.title}
+                  </p>
+                </div>
+
+                {/* 3. Phần Kính gửi */}
+                <div className="pb-4 font-sans text-xs md:text-sm space-y-1">
+                  <p className="font-semibold text-slate-900">
+                    Kính gửi:{" "}
+                    <span className="font-normal text-slate-700">
+                      {docData.workflow?.leader?.fullName
+                        ? `Đ/c ${docData.workflow.leader.fullName} - Lãnh đạo cơ quan`
+                        : "Ban Giám đốc và Thủ trưởng cơ quan"}
+                    </span>
+                  </p>
+                  {docData.workflow?.unit?.name && (
+                    <p className="text-slate-600 pl-4">
+                      - Đơn vị phụ trách giải quyết: <strong>{docData.workflow.unit.name}</strong>
+                    </p>
+                  )}
+                </div>
+
+                {/* 4. Nội dung chi tiết các phần chuẩn NĐ 30 */}
+                <div className="space-y-5 text-xs md:text-sm text-slate-800 pt-2">
+                  {/* Mục I: Căn cứ & Thông tin văn bản */}
+                  <div>
+                    <h3 className="font-bold text-slate-900 font-sans uppercase text-xs tracking-wider border-b border-slate-200 pb-1 flex items-center justify-between">
+                      <span>I. CĂN CỨ VÀ THÔNG TIN TIẾP NHẬN</span>
+                      <span className="text-[11px] font-normal normal-case text-slate-500">
+                        {docData.documentBook?.name || "Văn bản hành chính"}
+                      </span>
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2 bg-slate-50/70 p-3 rounded border border-slate-200/80 font-sans text-xs">
+                      <div>
+                        <span className="text-slate-500">Cơ quan / Người gửi:</span>{" "}
+                        <strong className="text-slate-800">
+                          {docData.senderOrg?.name || docData.senderName || "Chưa ghi nhận"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Số/ký hiệu văn bản:</span>{" "}
+                        <strong className="text-slate-800">
+                          {docData.documentNumber || docData.originalCode || "Chưa vào sổ"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Ngày văn bản:</span>{" "}
+                        <span className="text-slate-700 font-medium">
+                          {docData.issuedDate
+                            ? new Date(docData.issuedDate).toLocaleDateString("vi-VN")
+                            : "Theo ngày tiếp nhận"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Độ khẩn / Độ mật:</span>{" "}
+                        <span className="text-slate-700 font-medium">
+                          {docData.urgency === "NORMAL" ? "Thường" : docData.urgency} /{" "}
+                          {docData.security === "NORMAL" ? "Thường" : docData.security}
+                        </span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-slate-500">Trạng thái hồ sơ:</span>{" "}
+                        <span className="inline-block ml-1">
+                          <DocumentStatusBadge status={docData.status} />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mục II: Tóm tắt nội dung & Yêu cầu */}
+                  <div>
+                    <h3 className="font-bold text-slate-900 font-sans uppercase text-xs tracking-wider border-b border-slate-200 pb-1">
+                      II. NỘI DUNG VĂN BẢN & YÊU CẦU GIẢI QUYẾT
+                    </h3>
+                    <div className="mt-2 space-y-2 text-slate-800 leading-relaxed">
+                      <p>
+                        <strong>1. Trích yếu:</strong> {docData.title}
+                      </p>
+                      {docData.summaryNotes ? (
+                        <div className="whitespace-pre-wrap bg-amber-50/40 p-3 rounded border border-amber-200/60 font-sans text-xs">
+                          <strong>2. Nội dung tóm tắt / Đề xuất:</strong>
+                          <div className="mt-1 text-slate-700">{docData.summaryNotes}</div>
+                        </div>
+                      ) : (
+                        <p className="text-slate-600 italic">
+                          Toàn bộ văn bản gốc, căn cứ thẩm định và các tài liệu liên quan được đính kèm tại mục hồ sơ tệp gốc bên dưới.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mục III: Ý kiến chỉ đạo / Bút phê của Lãnh đạo */}
+                  <div>
+                    <h3 className="font-bold text-slate-900 font-sans uppercase text-xs tracking-wider border-b border-slate-200 pb-1">
+                      III. Ý KIẾN CHỈ ĐẠO & BÚT PHÊ CỦA LÃNH ĐẠO CƠ QUAN
+                    </h3>
+                    <div className="mt-2.5 border-2 border-indigo-200 bg-indigo-50/30 rounded-lg p-4 font-sans space-y-2.5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-slate-500">Lãnh đạo nhận trình:</span>{" "}
+                          <strong className="text-indigo-900">
+                            {docData.workflow?.leader?.fullName || "Chưa trình lãnh đạo"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Phòng ban được giao:</span>{" "}
+                          <strong className="text-slate-800">
+                            {docData.workflow?.unit?.name || "Chưa phân phối"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Trưởng phòng nhận chỉ đạo:</span>{" "}
+                          <strong className="text-slate-800">
+                            {docData.workflow?.head?.fullName || "Chưa phân phối"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Thời hạn hoàn thành:</span>{" "}
+                          <strong className="text-rose-700">
+                            {docData.processingDeadline
+                              ? new Date(docData.processingDeadline).toLocaleDateString("vi-VN")
+                              : "Theo quy chế chung"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-indigo-100 pt-2">
+                        <span className="text-xs font-bold text-indigo-950 uppercase tracking-wide block mb-1">
+                          ✍️ Ý kiến chỉ đạo của Lãnh đạo:
+                        </span>
+                        {docData.workflow?.instruction ? (
+                          <div className="p-3 bg-white rounded border border-indigo-200 text-slate-900 italic font-serif text-sm">
+                            &ldquo;{docData.workflow.instruction}&rdquo;
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 italic">
+                            Chưa có bút phê phân phối của Lãnh đạo cơ quan.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mục IV: Danh sách tệp văn kiện đính kèm */}
+                  {docData.files && docData.files.length > 0 && (
+                    <div>
+                      <h3 className="font-bold text-slate-900 font-sans uppercase text-xs tracking-wider border-b border-slate-200 pb-1">
+                        IV. TỆP VĂN KIỆN ĐÍNH KÈM ({docData.files.length})
+                      </h3>
+                      <ul className="mt-2 space-y-1.5 font-sans text-xs">
+                        {docData.files.map((file) => (
+                          <li
+                            key={file.id}
+                            className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
+                          >
+                            <span className="font-medium text-slate-800 flex items-center gap-1.5">
+                              <FileText className="h-4 w-4 text-indigo-600" />
+                              {file.fileName} ({(file.fileSize / 1024).toFixed(1)} KB)
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedFileId(file.id);
+                                  setPreviewMode("pdf");
+                                }}
+                                className="text-indigo-600 hover:underline font-semibold cursor-pointer"
+                              >
+                                Xem file
+                              </button>
+                              <a
+                                href={`/api/files/${file.id}`}
+                                download={file.fileName}
+                                className="text-slate-600 hover:text-slate-900"
+                              >
+                                Tải về
+                              </a>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Chân trang văn bản: Nơi nhận & Chữ ký */}
+                <div className="grid grid-cols-2 gap-6 pt-8 mt-6 border-t border-slate-200 font-sans">
+                  {/* Cột trái: Nơi nhận */}
+                  <div className="text-xs space-y-1">
+                    <p className="font-bold uppercase text-slate-900">Nơi nhận:</p>
+                    <p className="text-slate-700">- Như Kính gửi;</p>
+                    {docData.recipientsSummary && (
+                      <p className="text-slate-700">- {docData.recipientsSummary};</p>
+                    )}
+                    <p className="text-slate-700">
+                      - Lưu: VT, Hồ sơ ({docData.workflow?.trackingCode || docData.id.slice(-6).toUpperCase()}).
+                    </p>
+                  </div>
+
+                  {/* Cột phải: Người ký / Phê duyệt */}
+                  <div className="text-center text-xs space-y-1">
+                    <p className="font-bold uppercase tracking-wider text-slate-900">
+                      {docData.direction === "INCOMING"
+                        ? "LÃNH ĐẠO / NGƯỜI ĐỀ NGHỊ"
+                        : "NGƯỜI KÝ DUYỆT VĂN BẢN"}
+                    </p>
+                    <p className="text-slate-500 italic text-[11px]">
+                      (Ký, ghi rõ họ tên và đóng dấu)
+                    </p>
+                    <div className="h-16 flex items-center justify-center">
+                      <div className="w-24 border-b border-dashed border-slate-300" />
+                    </div>
+                    <p className="font-bold text-slate-900 text-sm">
+                      {docData.signerName ||
+                        docData.workflow?.leader?.fullName ||
+                        docData.senderName ||
+                        "Nguyễn Văn Dân"}
+                    </p>
+                    <p className="text-slate-600 text-[11px]">
+                      {docData.direction === "INCOMING" ? "Người gửi / Tiếp nhận" : "Lãnh đạo đơn vị"}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             /* Tab PDF Viewer */

@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       position: { isActive: true },
       roles: { some: { role: { code: "SPECIALIST", isActive: true } } },
     };
-    const users = await prisma.user.findMany({
+    let users = await prisma.user.findMany({
       where: { isActive: true, positions: { some: positions } },
       orderBy: [{ fullName: "asc" }, { employeeCode: "asc" }],
       select: {
@@ -54,6 +54,40 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+
+    if (users.length === 0) {
+      users = await prisma.user.findMany({
+        where: {
+          isActive: true,
+          positions: {
+            some: {
+              startedAt: { lte: new Date() },
+              endedAt: null,
+              unit: { isActive: true },
+              position: { isActive: true },
+              roles: { some: { role: { code: "SPECIALIST", isActive: true } } },
+            },
+          },
+        },
+        orderBy: [{ fullName: "asc" }, { employeeCode: "asc" }],
+        select: {
+          id: true,
+          employeeCode: true,
+          fullName: true,
+          positions: {
+            where: {
+              endedAt: null,
+              unit: { isActive: true },
+              roles: { some: { role: { code: "SPECIALIST", isActive: true } } },
+            },
+            select: {
+              unit: { select: { id: true, name: true } },
+              roles: { select: { role: { select: { code: true, name: true } } } },
+            },
+          },
+        },
+      });
+    }
     return successResponse(users);
   } catch (error) {
     return errorResponse(error);

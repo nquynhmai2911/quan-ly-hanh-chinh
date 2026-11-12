@@ -13,7 +13,7 @@ import {
 } from "@/modules/document/schema";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Send, UploadCloud, ArrowLeft, Building2, User } from "lucide-react";
+import { Send, UploadCloud, ArrowLeft, Building2, User, Sparkles, FileText } from "lucide-react";
 
 export default function NewOutgoingDraftPage() {
   const router = useRouter();
@@ -137,6 +137,58 @@ export default function NewOutgoingDraftPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Thanh nạp mẫu nhanh chuẩn NĐ 30 */}
+        <div className="bg-indigo-50/70 border border-indigo-200 rounded-lg p-3.5 space-y-2">
+          <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5 uppercase tracking-wide">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            Nạp mẫu soạn thảo chuẩn (Nghị định 30/2020/NĐ-CP)
+          </span>
+          <p className="text-xs text-slate-600">
+            Chọn thể thức văn bản để nạp sẵn cấu trúc tiêu đề, chức vụ ký và nơi nhận:
+          </p>
+          <div className="flex flex-wrap gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setValue("documentTypeId", "TTr");
+                setValue("title", "Tờ trình về việc đề xuất phê duyệt chủ trương và kế hoạch triển khai công tác");
+                setValue("signerPosition", "Trưởng phòng");
+                setValue("recipientsSummary", "Ban Giám đốc, Các đơn vị liên quan");
+                toast.success("Đã nạp mẫu Tờ trình (TTr)");
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-white text-indigo-800 border border-indigo-200 rounded hover:bg-indigo-100 hover:border-indigo-400 transition-colors shadow-2xs cursor-pointer"
+            >
+              📋 Mẫu Tờ trình (TTr)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setValue("documentTypeId", "CV");
+                setValue("title", "V/v phối hợp công tác và trao đổi nghiệp vụ chuyên môn");
+                setValue("signerPosition", "Giám đốc");
+                setValue("recipientsSummary", "Các cơ quan phối hợp, UBND Tỉnh, Các phòng ban");
+                toast.success("Đã nạp mẫu Công văn (CV)");
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-white text-indigo-800 border border-indigo-200 rounded hover:bg-indigo-100 hover:border-indigo-400 transition-colors shadow-2xs cursor-pointer"
+            >
+              📄 Mẫu Công văn (CV)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setValue("documentTypeId", "BC");
+                setValue("title", "Báo cáo kết quả thực hiện nhiệm vụ công tác tháng và phương hướng thời gian tới");
+                setValue("signerPosition", "Giám đốc");
+                setValue("recipientsSummary", "Cơ quan cấp trên, Ban Giám đốc");
+                toast.success("Đã nạp mẫu Báo cáo (BC)");
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-white text-indigo-800 border border-indigo-200 rounded hover:bg-indigo-100 hover:border-indigo-400 transition-colors shadow-2xs cursor-pointer"
+            >
+              📊 Mẫu Báo cáo (BC)
+            </button>
+          </div>
+        </div>
+
         <div className="bg-white rounded border border-slate-200 p-6 shadow-xs space-y-4">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
             <Send className="h-4 w-4 text-indigo-600" />

@@ -197,7 +197,14 @@ export async function requireRecipient(
         some: {
           startedAt: { lte: new Date() },
           endedAt: null,
-          unitId,
+          ...(unitId
+            ? {
+                OR: [
+                  { unitId },
+                  { unit: { level: 0 } },
+                ],
+              }
+            : {}),
           unit: { isActive: true },
           position: { isActive: true },
           roles: {
@@ -205,7 +212,7 @@ export async function requireRecipient(
               role: {
                 code:
                   role === "DEPT_HEAD"
-                    ? { in: ["DEPT_HEAD", "LEADER"] }
+                    ? { in: ["DEPT_HEAD", "LEADER", "SPECIALIST"] }
                     : role,
                 isActive: true,
               },

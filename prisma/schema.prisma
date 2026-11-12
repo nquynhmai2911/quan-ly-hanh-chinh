@@ -189,12 +189,13 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-/// Gán quyền trực tiếp cho từng tài khoản người dùng (ngoài các quyền được thừa hưởng từ Vai trò)
+/// Gán quyền trực tiếp cho từng tài khoản người dùng (cấp thêm hoặc tước bỏ quyền thừa hưởng từ Vai trò)
 model UserPermission {
   id           String     @id @default(cuid())
   userId       String     @map("user_id")
   permissionId String     @map("permission_id")
   dataScope    DataScope? @default(OWN) @map("data_scope")
+  isDenied     Boolean    @default(false) @map("is_denied")
   createdAt    DateTime   @default(now()) @map("created_at")
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -62,10 +62,6 @@ export function incomingActions(
       requiresReason,
       isOptimisticAllowed: false,
     });
-  const clerk =
-    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_FORWARD) ||
-    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_FORWARD) ||
-    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS);
   const leader =
     hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ANNOTATE) &&
     (isAdmin(ctx) || doc.workflow?.leaderId === ctx.userId);
@@ -75,59 +71,78 @@ export function incomingActions(
     (isAdmin(ctx) ||
       doc.workflow?.headId === ctx.userId ||
       doc.workflow?.leaderId === ctx.userId);
-  if (
-    doc.status === "SUBMITTED" &&
-    (hasRolePermission(ctx, "CLERK", Permissions.INCOMING_REGISTER) ||
-      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_REGISTER) ||
-      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS))
-  )
+
+  const isLeader =
+    isAdmin(ctx) ||
+    ctx.roleCodes.includes("LEADER") ||
+    hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ANNOTATE) ||
+    hasRolePermission(ctx, "LEADER", Permissions.INCOMING_COMPLETE);
+
+  const isSpecialist =
+    isAdmin(ctx) ||
+    ctx.roleCodes.includes("SPECIALIST") ||
+    ctx.roleCodes.includes("CLERK") ||
+    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS) ||
+    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_FORWARD) ||
+    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_FORWARD);
+
+  if (doc.status === "SUBMITTED" && isSpecialist) {
     add("RECEIVE_CITIZEN", "RECEIVED");
-  if (doc.status === "RECEIVED" && clerk) {
+  }
+
+  if (doc.status === "RECEIVED" && isSpecialist) {
     add("CLERK_DISTRIBUTE", "PROCESSING");
+    add("SUBMIT_REVIEW", "PENDING_REVIEW");
     add("SUBMIT_LEADER", "PENDING_LEADER");
   }
-  if (doc.status === "PENDING_LEADER" && leader) {
+
+  if (doc.status === "PENDING_LEADER" && (isLeader || leader)) {
     add("LEADER_ANNOTATE", "DISTRIBUTED", true);
     add("RETURN_CLERK", "RECEIVED", true);
   }
+
   if (doc.status === "DISTRIBUTED" && head) {
     add("DEPT_HEAD_ASSIGN", "PROCESSING");
     add("DEPT_HEAD_RETURN", "PENDING_LEADER", true);
   }
+
   const workers = doc.handlers.filter((h) => h.role !== "INFO");
   const allReported =
-    workers.length > 0 &&
-    workers.some((h) => h.role === "MAIN") &&
-    workers.every((h) => ["REPORTED", "CONFIRMED"].includes(h.status));
-  if (
-    doc.status === "PROCESSING" &&
-    allReported &&
-    (head ||
-      leader ||
-      isAdmin(ctx) ||
+    !workers.length ||
+    (workers.some((h) => h.role === "MAIN") &&
+      workers.every((h) => ["REPORTED", "CONFIRMED"].includes(h.status)));
+
+  if (doc.status === "PROCESSING" && allReported) {
+    if (
+      head ||
+      isLeader ||
       (doc.handlers.some(
         (h) => h.assigneeId === ctx.userId && h.role === "MAIN",
       ) &&
         ctx.permissions.has(Permissions.INCOMING_PROCESS)) ||
-      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS))
-  )
-    add("SUBMIT_REVIEW", "PENDING_REVIEW");
+      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS)
+    ) {
+      add("SUBMIT_REVIEW", "PENDING_REVIEW");
+    }
+  }
+
   if (
     doc.status === "PENDING_REVIEW" &&
-    (head || leader || isAdmin(ctx)) &&
-    (isAdmin(ctx) || ctx.permissions.has(Permissions.INCOMING_COMPLETE))
+    (head || isLeader)
   ) {
-    if (allReported) add("APPROVE_COMPLETE", "COMPLETED");
+    add("APPROVE_COMPLETE", "COMPLETED");
     add("REJECT_REPORT", "PROCESSING", true);
   }
+
   // Hồ sơ cũ từng bị đổi trạng thái mà chưa ghi người nhận: phục hồi có ghi lịch sử.
   if (
     isAdmin(ctx) &&
     ["DISTRIBUTED", "PROCESSING", "PENDING_REVIEW"].includes(doc.status) &&
     !doc.workflow?.headId &&
     !doc.handlers.length
-  )
+  ) {
     add("RETURN_CLERK", "RECEIVED", true);
+  }
   return result;
 }
 
@@ -328,7 +343,12 @@ export async function transitionIncoming(
           "VALIDATION_ERROR",
           "Cần vào sổ văn bản trước khi phân phối.",
         );
-      if (!input.unitId)
+      const unitId =
+        input.unitId ||
+        ctx.primaryPosition?.unitId ||
+        (await tx.unit.findFirst({ where: { isActive: true, level: { gt: 0 } } }))?.id ||
+        (await tx.unit.findFirst({ where: { isActive: true } }))?.id;
+      if (!unitId)
         throw new BusinessError(
           "VALIDATION_ERROR",
           "Vui lòng chọn phòng ban xử lý.",
@@ -337,7 +357,7 @@ export async function transitionIncoming(
         tx,
         input.headId || ctx.userId,
         "SPECIALIST",
-        input.unitId,
+        unitId,
       );
       // Gán lãnh đạo cơ quan phê duyệt mặc định nếu chưa gán
       let leaderId = doc.workflow?.leaderId;
@@ -362,7 +382,7 @@ export async function transitionIncoming(
           isActive: true,
           positions: {
             some: {
-              unitId: input.unitId,
+              unitId,
               roles: { some: { role: { code: { in: ["LEADER", "DEPT_HEAD"] }, isActive: true } } },
             },
           },
@@ -376,15 +396,15 @@ export async function transitionIncoming(
           registrarId: ctx.userId,
           leaderId: leaderId || undefined,
           headId: unitHead?.id || specialist.id,
-          unitId: input.unitId,
-          instruction: reason || "Văn thư chuyển Chuyên viên chủ trì giải quyết đúng hạn.",
+          unitId,
+          instruction: reason || "Chuyên viên chủ trì giải quyết hồ sơ đúng hạn.",
         },
         update: {
           registrarId: ctx.userId,
           ...(leaderId ? { leaderId } : {}),
           headId: unitHead?.id || specialist.id,
-          unitId: input.unitId,
-          instruction: reason || "Văn thư chuyển Chuyên viên chủ trì giải quyết đúng hạn.",
+          unitId,
+          instruction: reason || "Chuyên viên chủ trì giải quyết hồ sơ đúng hạn.",
         },
       });
 
@@ -396,7 +416,7 @@ export async function transitionIncoming(
           documentId: id,
           assignerId: ctx.userId,
           assigneeId: specialist.id,
-          unitId: input.unitId,
+          unitId,
           role: "MAIN",
           deadline,
           instruction: reason || "Chuyên viên chủ trì xử lý hồ sơ và báo cáo kết quả trình Lãnh đạo phê duyệt.",
@@ -406,7 +426,7 @@ export async function transitionIncoming(
       data.processingDeadline = deadline;
       data.status = "PROCESSING";
       recipients = [specialist.id];
-      reason = `Văn thư giao Chuyên viên ${specialist.fullName} (${specialist.employeeCode}) chủ trì xử lý: ${reason || "Xử lý theo quy định"}`;
+      reason = `Chuyên viên ${specialist.fullName} (${specialist.employeeCode}) chủ trì thụ lý giải quyết: ${reason || "Xử lý theo quy định"}`;
     } else if (input.action === "SUBMIT_LEADER") {
       if (!doc.documentNumber || !doc.documentBookId || !doc.files.length)
         throw new BusinessError(
@@ -465,7 +485,8 @@ export async function transitionIncoming(
         data: { headId: null, unitId: null },
       });
     } else if (input.action === "SUBMIT_REVIEW") {
-      if (!doc.workflow?.headId && !doc.workflow?.leaderId) {
+      let leaderId = doc.workflow?.leaderId;
+      if (!leaderId) {
         const defaultLeader = await tx.user.findFirst({
           where: {
             isActive: true,
@@ -478,43 +499,75 @@ export async function transitionIncoming(
             },
           },
         });
-        if (defaultLeader) {
-          if (doc.workflow) {
-            await tx.incomingWorkflow.update({
-              where: { documentId: id },
-              data: { leaderId: defaultLeader.id },
-            });
-          }
-          recipients = [defaultLeader.id];
-        } else {
-          throw new BusinessError(
-            "CONFLICT",
-            "Hồ sơ chưa có người chịu trách nhiệm duyệt.",
-          );
-        }
-      } else {
-        recipients = [doc.workflow.leaderId || doc.workflow.headId];
+        if (defaultLeader) leaderId = defaultLeader.id;
       }
+      if (doc.workflow) {
+        await tx.incomingWorkflow.update({
+          where: { documentId: id },
+          data: {
+            leaderId: leaderId || undefined,
+            instruction: reason || doc.workflow.instruction || "Chuyên viên đã kiểm tra hồ sơ và trình Lãnh đạo phê duyệt.",
+          },
+        });
+      }
+      if (!doc.handlers.length) {
+        await tx.documentHandler.create({
+          data: {
+            documentId: id,
+            assigneeId: ctx.userId,
+            assignerId: ctx.userId,
+            role: "MAIN",
+            status: "REPORTED",
+            reportContent: reason || "Hồ sơ hợp lệ, Chuyên viên kính trình Lãnh đạo xem xét phê duyệt.",
+            completedAt: new Date(),
+          },
+        });
+      } else {
+        await tx.documentHandler.updateMany({
+          where: {
+            documentId: id,
+            role: { not: "INFO" },
+            status: { in: ["ASSIGNED", "PROCESSING"] },
+          },
+          data: { status: "REPORTED", completedAt: new Date() },
+        });
+      }
+      recipients = [leaderId, doc.creatorId];
+      reason = reason || `Chuyên viên ${ctx.fullName} trình Lãnh đạo xem xét phê duyệt hồ sơ`;
     } else if (input.action === "REJECT_REPORT") {
       await tx.documentHandler.updateMany({
         where: { documentId: id, role: { not: "INFO" } },
         data: { status: "RETURNED", completedAt: null },
       });
+      data.status = "PROCESSING";
       recipients = doc.handlers
         .filter((h) => h.role !== "INFO")
         .map((h) => h.assigneeId);
+      if (doc.workflow?.registrarId) recipients.push(doc.workflow.registrarId);
+      reason = reason || "Lãnh đạo yêu cầu bổ sung / xử lý lại hồ sơ";
     } else if (input.action === "APPROVE_COMPLETE") {
       await tx.documentHandler.updateMany({
         where: { documentId: id, role: { not: "INFO" } },
         data: { status: "CONFIRMED" },
       });
       data.isLocked = true;
+      if (doc.workflow) {
+        await tx.incomingWorkflow.update({
+          where: { documentId: id },
+          data: {
+            leaderId: ctx.userId,
+            instruction: reason || doc.workflow.instruction || "Đã phê duyệt hoàn tất và trả kết quả cho Người dân.",
+          },
+        });
+      }
       recipients = [
         doc.creatorId,
         doc.workflow?.registrarId,
         doc.workflow?.leaderId,
+        ctx.userId,
         ...doc.handlers.map((h) => h.assigneeId),
       ];
+      reason = reason || `Lãnh đạo ${ctx.fullName} đã duyệt đơn và hoàn tất giải quyết`;
     }
     const updated = await tx.document.update({ where: { id }, data });
     await audit(tx, ctx, doc, input.action, action.toStatus, reason);

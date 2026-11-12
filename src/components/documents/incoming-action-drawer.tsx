@@ -421,22 +421,38 @@ export function IncomingActionDrawer({
                 ? "Ý kiến chỉ đạo / Bút phê của Lãnh đạo *"
                 : action.action === "CLERK_DISTRIBUTE"
                   ? "Ý kiến phân phối / Nội dung chuyển giao"
-                  : "Ý kiến / Lý do giải quyết"}
+                  : action.action === "APPROVE_COMPLETE"
+                    ? "Ý kiến phê duyệt đơn (Hoàn tất & Trả kết quả cho Người dân)"
+                    : action.action === "SUBMIT_REVIEW"
+                      ? "Nội dung tờ trình / Ý kiến đề xuất phê duyệt"
+                      : "Ý kiến / Lý do giải quyết"}
               {action.requiresReason ? " *" : ""}
             </label>
 
-            {["LEADER_ANNOTATE", "CLERK_DISTRIBUTE"].includes(action.action) && (
+            {["LEADER_ANNOTATE", "CLERK_DISTRIBUTE", "APPROVE_COMPLETE", "SUBMIT_REVIEW"].includes(action.action) && (
               <div className="space-y-1">
                 <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
                   <Sparkles className="h-3 w-3 text-amber-500" /> Gợi ý nội dung nhanh:
                 </span>
                 <div className="flex flex-col gap-1.5">
-                  {(action.action === "CLERK_DISTRIBUTE"
+                  {(action.action === "APPROVE_COMPLETE"
                     ? [
-                        "Kính chuyển phòng ban chuyên môn chủ trì giải quyết đúng hạn.",
-                        "Chuyển đơn vị phối hợp xác minh và tham mưu xử lý.",
-                        "Đề nghị đơn vị nghiên cứu xử lý theo chức năng nhiệm vụ.",
+                        "Đồng ý phê duyệt, hồ sơ hợp lệ và đầy đủ điều kiện theo quy định.",
+                        "Phê duyệt kết quả giải quyết thủ tục cho người dân.",
+                        "Nhất trí thông qua kết quả xử lý của chuyên viên, hoàn tất giải quyết.",
                       ]
+                    : action.action === "SUBMIT_REVIEW"
+                      ? [
+                          "Kính trình Lãnh đạo xem xét, phê duyệt kết quả giải quyết hồ sơ.",
+                          "Hồ sơ đã được thẩm định đầy đủ và hợp lệ, kính trình Lãnh đạo duyệt.",
+                          "Chuyên viên đã kiểm tra hồ sơ và kính trình Lãnh đạo phê duyệt ban hành.",
+                        ]
+                    : action.action === "CLERK_DISTRIBUTE"
+                      ? [
+                          "Chuyên viên tiếp nhận và trực tiếp thụ lý giải quyết hồ sơ đúng hạn.",
+                          "Kính chuyển phòng ban chuyên môn chủ trì giải quyết đúng hạn.",
+                          "Chuyển đơn vị phối hợp xác minh và tham mưu xử lý.",
+                        ]
                     : QUICK_INSTRUCTIONS
                   ).map((hint, idx) => (
                     <button
@@ -461,7 +477,11 @@ export function IncomingActionDrawer({
                   ? "Nhập ý kiến chỉ đạo, yêu cầu chuyên môn hoặc chọn gợi ý bên trên…"
                   : action.action === "CLERK_DISTRIBUTE"
                     ? "Nhập ý kiến phân phối hoặc chọn gợi ý bên trên…"
-                    : "Nhập nội dung ý kiến hoặc lý do thực hiện thao tác…"
+                    : action.action === "APPROVE_COMPLETE"
+                      ? "Nhập ý kiến phê duyệt hoặc chọn gợi ý bên trên…"
+                      : action.action === "SUBMIT_REVIEW"
+                        ? "Nhập nội dung trình Lãnh đạo hoặc chọn gợi ý bên trên…"
+                        : "Nhập nội dung ý kiến hoặc lý do thực hiện thao tác…"
               }
               className={inputStyle}
               value={reason}
@@ -478,8 +498,12 @@ export function IncomingActionDrawer({
             >
               Hủy
             </Button>
-            <Button type="submit" isLoading={saving}>
-              Xác nhận
+            <Button
+              type="submit"
+              isLoading={saving}
+              className={action.action === "APPROVE_COMPLETE" ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold" : ""}
+            >
+              {action.action === "APPROVE_COMPLETE" ? "Xác nhận Duyệt đơn" : "Xác nhận"}
             </Button>
           </div>
         </form>

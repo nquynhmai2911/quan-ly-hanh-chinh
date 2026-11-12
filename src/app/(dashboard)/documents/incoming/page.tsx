@@ -67,6 +67,7 @@ export default function IncomingDocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [canCreate, setCanCreate] = useState(false);
+  const [isCitizen, setIsCitizen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<EditableDocument | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<IncomingItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -75,12 +76,31 @@ export default function IncomingDocumentsPage() {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((j) => {
-        if (j.success)
+        if (j.success) {
+          const citizen =
+            j.data.roles?.includes("CITIZEN") &&
+            !j.data.roles.some((r: string) =>
+              [
+                "ADMIN",
+                "CLERK",
+                "LEADER",
+                "DEPT_HEAD",
+                "SPECIALIST",
+              ].includes(r),
+            );
+          setIsCitizen(citizen);
           setCanCreate(
             j.data.roles.some((r: string) =>
-              ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+              [
+                "ADMIN",
+                "CLERK",
+                "LEADER",
+                "DEPT_HEAD",
+                "SPECIALIST",
+              ].includes(r),
             ),
           );
+        }
       });
   }, []);
 
@@ -235,40 +255,44 @@ export default function IncomingDocumentsPage() {
             <Eye className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
             Chi tiết
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs whitespace-nowrap shrink-0 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-            onClick={() =>
-              setEditingDoc({
-                id: row.original.id,
-                direction: "INCOMING",
-                title: row.original.title,
-                documentNumber: row.original.documentNumber,
-                originalCode: row.original.originalCode,
-                senderName:
-                  row.original.senderOrg?.name || row.original.senderName,
-                urgency: row.original.urgency,
-                security: row.original.security as any,
-                issuedDate: row.original.issuedDate,
-                processingDeadline: row.original.processingDeadline,
-              })
-            }
-            title="Chỉnh sửa thông tin"
-          >
-            <Pencil className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Sửa
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs whitespace-nowrap shrink-0 px-2 text-rose-600 hover:bg-rose-50 border-rose-200"
-            onClick={() => setDeletingDoc(row.original)}
-            title="Xóa văn bản"
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Xóa
-          </Button>
+          {!isCitizen && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs whitespace-nowrap shrink-0 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                onClick={() =>
+                  setEditingDoc({
+                    id: row.original.id,
+                    direction: "INCOMING",
+                    title: row.original.title,
+                    documentNumber: row.original.documentNumber,
+                    originalCode: row.original.originalCode,
+                    senderName:
+                      row.original.senderOrg?.name || row.original.senderName,
+                    urgency: row.original.urgency,
+                    security: row.original.security as any,
+                    issuedDate: row.original.issuedDate,
+                    processingDeadline: row.original.processingDeadline,
+                  })
+                }
+                title="Chỉnh sửa thông tin"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1 shrink-0" />
+                Sửa
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs whitespace-nowrap shrink-0 px-2 text-rose-600 hover:bg-rose-50 border-rose-200"
+                onClick={() => setDeletingDoc(row.original)}
+                title="Xóa văn bản"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1 shrink-0" />
+                Xóa
+              </Button>
+            </>
+          )}
         </div>
       ),
     },
@@ -280,20 +304,30 @@ export default function IncomingDocumentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Văn bản đến
+            {isCitizen ? "Văn bản đến (Hồ sơ của tôi)" : "Văn bản đến"}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quản lý tiếp nhận, vào sổ, trình bút phê và phân công xử lý văn bản
-            đến
+            {isCitizen
+              ? "Theo dõi trạng thái, tiến độ xử lý và nhận kết quả giải quyết văn bản/hồ sơ đã nộp"
+              : "Quản lý tiếp nhận, vào sổ, trình bút phê và phân công xử lý văn bản đến"}
           </p>
         </div>
-        {canCreate && (
-          <Link href="/documents/incoming/new">
-            <Button className="gap-1.5 shadow-sm">
+        {isCitizen ? (
+          <Link href="/citizen/submit">
+            <Button className="gap-1.5 shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white">
               <Plus className="h-4 w-4" />
-              Vào sổ văn bản đến mới
+              Nộp hồ sơ trực tuyến mới
             </Button>
           </Link>
+        ) : (
+          canCreate && (
+            <Link href="/documents/incoming/new">
+              <Button className="gap-1.5 shadow-sm">
+                <Plus className="h-4 w-4" />
+                Vào sổ văn bản đến mới
+              </Button>
+            </Link>
+          )
         )}
       </div>
 

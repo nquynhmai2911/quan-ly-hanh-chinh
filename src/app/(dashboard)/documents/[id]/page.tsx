@@ -128,6 +128,7 @@ export default function DocumentDetailPage({
   >("info");
   const [previewMode, setPreviewMode] = useState<"doc" | "pdf">("pdf");
   const [isLoading, setIsLoading] = useState(true);
+  const [isCitizenUser, setIsCitizenUser] = useState(false);
 
   // Action states
   const [selectedAction, setSelectedAction] = useState<AllowedAction | null>(
@@ -198,6 +199,9 @@ export default function DocumentDetailPage({
         setCanAssign(!!json.data.canAssign);
         setCanAttach(!!json.data.canAttach);
         setCanReport(!!json.data.canReport);
+        if (typeof json.data.isCitizen === "boolean") {
+          setIsCitizenUser(json.data.isCitizen);
+        }
         setAuditLogs(json.data.auditLogs || []);
         setAllowedActions(json.data.allowedActions || []);
       } else {
@@ -209,6 +213,30 @@ export default function DocumentDetailPage({
       setIsLoading(false);
     }
   }
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          const citizen =
+            j.data.roles?.includes("CITIZEN") &&
+            !j.data.roles.some((r: string) =>
+              [
+                "ADMIN",
+                "CLERK",
+                "LEADER",
+                "DEPT_HEAD",
+                "SPECIALIST",
+              ].includes(r),
+            );
+          if (citizen) {
+            setIsCitizenUser(true);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -389,27 +417,31 @@ export default function DocumentDetailPage({
 
         {/* Dynamic Action Buttons (Sinh từ State Machine) */}
         <div className="flex items-center gap-2">
-          {/* Nút Chỉnh sửa thông tin */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditDrawerOpen(true)}
-            className="text-xs text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-          >
-            <Pencil className="h-3.5 w-3.5 mr-1" />
-            Chỉnh sửa
-          </Button>
+          {!isCitizenUser && (
+            <>
+              {/* Nút Chỉnh sửa thông tin */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditDrawerOpen(true)}
+                className="text-xs text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+                Chỉnh sửa
+              </Button>
 
-          {/* Nút Xóa văn bản */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsDeleteDialogOpen(true)}
-            className="text-xs text-rose-600 hover:bg-rose-50 border-rose-200"
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            Xóa
-          </Button>
+              {/* Nút Xóa văn bản */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="text-xs text-rose-600 hover:bg-rose-50 border-rose-200"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Xóa
+              </Button>
+            </>
+          )}
 
           {/* Nút nộp báo cáo nếu là chuyên viên thụ lý */}
           {canReport && (
@@ -444,9 +476,13 @@ export default function DocumentDetailPage({
                   : "primary"
               }
               onClick={() => handleTriggerAction(act)}
-              className="text-xs shadow-xs"
+              className={`text-xs shadow-xs ${
+                act.action === "APPROVE_COMPLETE"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 shadow-sm"
+                  : ""
+              }`}
             >
-              {act.label}
+              {act.action === "APPROVE_COMPLETE" ? "Duyệt đơn" : act.label}
             </Button>
           ))}
         </div>
@@ -675,84 +711,11 @@ export default function DocumentDetailPage({
                     </div>
                   </div>
 
-                  {/* Hàng 3: Khung Ý kiến chỉ đạo của Lãnh đạo cơ quan (Bút phê) */}
-                  <div className="p-3.5 border-b border-slate-300 bg-slate-50/70">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                        4. Ý KIẾN CHỈ ĐẠO CỦA LÃNH ĐẠO CƠ QUAN
-                      </span>
-                      {docData.processingDeadline && (
-                        <span className="text-[11px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                          Hạn giải quyết: {new Date(docData.processingDeadline).toLocaleDateString("vi-VN")}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs mb-2.5">
-                      <div>Lãnh đạo phê duyệt: <strong className="text-slate-900">{docData.workflow?.leader?.fullName || "Nguyễn Văn An (Giám đốc)"}</strong></div>
-                      <div>Phòng ban chuyên môn: <strong className="text-slate-900">{docData.workflow?.unit?.name || "Phòng Tổ chức - Hành chính"}</strong></div>
-                      <div>Chuyên viên thụ lý chính: <strong className="text-slate-900">{docData.handlers?.find((h) => h.role === "MAIN")?.assignee?.fullName || docData.workflow?.head?.fullName || "Chưa phân công"}</strong></div>
-                      <div>Thời hạn hoàn thành: <strong className="text-slate-900">{docData.processingDeadline ? new Date(docData.processingDeadline).toLocaleDateString("vi-VN") : "Theo quy chế chung"}</strong></div>
-                    </div>
-
-                    <div className="bg-white p-3 rounded border border-slate-200 text-xs text-slate-900">
-                      <span className="font-bold text-slate-700 block text-[11px] uppercase mb-1">Ý kiến chỉ đạo / Bút phê:</span>
-                      {docData.status === "COMPLETED" ? (
-                        <div className="text-emerald-800 leading-relaxed font-semibold">
-                          ✓ Đã phê duyệt hoàn tất và trả kết quả cho Người dân ({docData.creator?.fullName || docData.senderName || "Công dân"}).
-                          {docData.workflow?.instruction && (
-                            <p className="font-normal italic text-slate-700 mt-1">&ldquo;{docData.workflow.instruction}&rdquo;</p>
-                          )}
-                        </div>
-                      ) : docData.workflow?.instruction ? (
-                        <div className="italic text-slate-800 leading-relaxed font-medium">
-                          &ldquo;{docData.workflow.instruction}&rdquo;
-                        </div>
-                      ) : (
-                        <p className="text-slate-400 italic">Hồ sơ đang trong quá trình thẩm tra và giải quyết.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hàng 4: Tiến độ & Phân công thực hiện tại phòng ban */}
-                  <div className="p-3.5 border-b border-slate-300 bg-white">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-900 block mb-2">
-                      5. TIẾN ĐỘ & BÁO CÁO XỬ LÝ CỦA CHUYÊN VIÊN
-                    </span>
-                    {docData.handlers && docData.handlers.length > 0 ? (
-                      <div className="space-y-2">
-                        {docData.handlers.map((h) => (
-                          <div key={h.id} className="p-2.5 rounded bg-slate-50 border border-slate-200 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-slate-900">
-                                {h.assignee.fullName} <span className="font-normal text-slate-500">({roleLabels[h.role] || h.role})</span>
-                              </span>
-                              <span className="font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-[11px]">
-                                {processingLabels[h.status] || h.status}
-                              </span>
-                            </div>
-                            {h.instruction && (
-                              <p className="text-slate-600 mt-1 italic">Nhiệm vụ: {h.instruction}</p>
-                            )}
-                            {h.reportContent && (
-                              <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded text-emerald-950 font-medium">
-                                <strong className="text-emerald-900 block mb-0.5 uppercase text-[11px]">Báo cáo kết quả xử lý:</strong>
-                                <p className="whitespace-pre-wrap">{h.reportContent}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-slate-400 italic text-xs">Văn thư chưa phân công chuyên viên xử lý hồ sơ này.</p>
-                    )}
-                  </div>
-
-                  {/* Hàng 5: Danh sách tệp đính kèm */}
+                  {/* Hàng 4: Danh sách tệp đính kèm */}
                   {docData.files && docData.files.length > 0 && (
                     <div className="p-3.5 bg-slate-50/40">
                       <span className="text-xs font-bold uppercase tracking-wider text-slate-900 block mb-2">
-                        6. HỒ SƠ TỆP VĂN KIỆN ĐÍNH KÈM ({docData.files.length})
+                        4. HỒ SƠ TỆP VĂN KIỆN ĐÍNH KÈM ({docData.files.length})
                       </span>
                       <div className="space-y-2">
                         {docData.files.map((file) => (

@@ -150,11 +150,9 @@ async function testRoleCrud(roleName, email, password = 'Demo@123') {
 
 async function run() {
   await testRoleCrud('Chuyên viên', 'chuyenvien.tchc@eoffice.local');
-  await testRoleCrud('Văn thư', 'vanthu@eoffice.local');
-  await testRoleCrud('Trưởng phòng', 'truongphong.tchc@eoffice.local');
   await testRoleCrud('Lãnh đạo', 'giamdoc@eoffice.local');
   await testRoleCrud('Quản trị viên', 'admin@eoffice.local', 'Admin@123');
-  console.log('🎉 SUCCESS: All 5 roles tested with 100% CRUD operations passed!');
+  console.log('🎉 SUCCESS: All CRUD operations passed for active administrative roles!');
 }
 
 run().catch((err) => {

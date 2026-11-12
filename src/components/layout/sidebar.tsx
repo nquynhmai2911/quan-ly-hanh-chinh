@@ -120,7 +120,11 @@ export function Sidebar({
       ...section,
       items: section.items.filter((item) =>
         citizenOnly
-          ? ["/citizen/submit", "/notifications"].includes(item.href)
+          ? [
+              "/documents/incoming",
+              "/citizen/submit",
+              "/notifications",
+            ].includes(item.href)
           : item.href !== "/citizen/submit",
       ),
     }))

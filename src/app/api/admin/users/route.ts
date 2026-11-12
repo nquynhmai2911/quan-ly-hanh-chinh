@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
               id: true,
               permissionId: true,
               dataScope: true,
+              isDenied: true,
               permission: {
                 select: {
                   id: true,

@@ -75,6 +75,7 @@ export async function GET(
               id: true,
               permissionId: true,
               dataScope: true,
+              isDenied: true,
               permission: {
                 select: {
                   id: true,
@@ -112,6 +113,21 @@ export async function GET(
       }
     }
 
+    const directPermissions = user.userPermissions
+      .filter((up) => !up.isDenied)
+      .map((up) => ({
+        id: up.id,
+        permissionId: up.permissionId,
+        dataScope: up.dataScope,
+        code: up.permission.code,
+        name: up.permission.name,
+        module: up.permission.module,
+      }));
+
+    const deniedPermissionIds = user.userPermissions
+      .filter((up) => up.isDenied)
+      .map((up) => up.permissionId);
+
     return successResponse({
       user: {
         id: user.id,
@@ -121,14 +137,8 @@ export async function GET(
       },
       roles,
       inheritedPermissionIds: Array.from(inheritedPermIdSet),
-      directPermissions: user.userPermissions.map((up) => ({
-        id: up.id,
-        permissionId: up.permissionId,
-        dataScope: up.dataScope,
-        code: up.permission.code,
-        name: up.permission.name,
-        module: up.permission.module,
-      })),
+      directPermissions,
+      deniedPermissionIds,
       allPermissions,
     });
   } catch (error) {
@@ -177,13 +187,26 @@ export async function POST(
         where: { userId },
       });
 
-      // 2. Tạo các quyền riêng mới
+      // 2. Tạo các quyền riêng mới (cấp thêm quyền, isDenied: false)
       if (recordsToCreate.length > 0) {
         await tx.userPermission.createMany({
           data: recordsToCreate.map((item) => ({
             userId,
             permissionId: item.permissionId,
             dataScope: item.dataScope || "OWN",
+            isDenied: false,
+          })),
+        });
+      }
+
+      // 3. Tạo các quyền bị tước bỏ / bỏ quyền (isDenied: true)
+      if (Array.isArray(body.deniedPermissionIds) && body.deniedPermissionIds.length > 0) {
+        await tx.userPermission.createMany({
+          data: body.deniedPermissionIds.map((pId: string) => ({
+            userId,
+            permissionId: pId,
+            dataScope: "OWN",
+            isDenied: true,
           })),
         });
       }

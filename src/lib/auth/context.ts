@@ -128,18 +128,23 @@ export async function getAuthContext(
     }
   }
 
-  // 3. Gom quyền cấp riêng cho từng tài khoản (UserPermission)
+  // 3. Xử lý quyền cấp riêng hoặc tước bỏ quyền cho từng tài khoản (UserPermission)
   if (user.userPermissions && user.userPermissions.length > 0) {
     for (const up of user.userPermissions) {
       const permCode = up.permission.code;
-      const userScope = (up.dataScope || "OWN") as DataScope;
-      const currentScope = permissionsMap.get(permCode);
+      if (up.isDenied) {
+        // BỎ QUYỀN / TƯỚC QUYỀN: Xóa quyền khỏi người dùng ngay cả khi vai trò có
+        permissionsMap.delete(permCode);
+      } else {
+        const userScope = (up.dataScope || "OWN") as DataScope;
+        const currentScope = permissionsMap.get(permCode);
 
-      if (
-        !currentScope ||
-        SCOPE_WEIGHT[userScope] > SCOPE_WEIGHT[currentScope]
-      ) {
-        permissionsMap.set(permCode, userScope);
+        if (
+          !currentScope ||
+          SCOPE_WEIGHT[userScope] > SCOPE_WEIGHT[currentScope]
+        ) {
+          permissionsMap.set(permCode, userScope);
+        }
       }
     }
   }

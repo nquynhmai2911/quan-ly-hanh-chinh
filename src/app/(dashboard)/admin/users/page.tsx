@@ -58,6 +58,7 @@ interface UserItem {
     id: string;
     permissionId: string;
     dataScope: string;
+    isDenied?: boolean;
     permission: {
       id: string;
       code: string;
@@ -100,6 +101,7 @@ interface UserPermissionDetail {
     name: string;
     module: string;
   }>;
+  deniedPermissionIds?: string[];
   allPermissions: PermissionItem[];
 }
 
@@ -158,9 +160,11 @@ export default function AdminUsersPage() {
   const [isLoadingPerms, setIsLoadingPerms] = useState(false);
   const [isSavingPerms, setIsSavingPerms] = useState(false);
   const [permSearch, setPermSearch] = useState("");
-  const [permFilter, setPermFilter] = useState<"ALL" | "DIRECT" | "INHERITED">("ALL");
+  const [permFilter, setPermFilter] = useState<"ALL" | "DIRECT" | "INHERITED" | "DENIED">("ALL");
   // Map lưu permissionId -> dataScope cho các quyền riêng
   const [directPermsMap, setDirectPermsMap] = useState<Map<string, string>>(new Map());
+  // Set lưu permissionId các quyền bị tước/bỏ quyền đối với tài khoản cá nhân
+  const [deniedPermsSet, setDeniedPermsSet] = useState<Set<string>>(new Set());
   const userPermCache = useRef<Map<string, UserPermissionDetail>>(new Map());
 
   // Form Thêm tài khoản mới
@@ -356,6 +360,7 @@ export default function AdminUsersPage() {
         directMap.set(dp.permissionId, dp.dataScope || "OWN");
       });
       setDirectPermsMap(directMap);
+      setDeniedPermsSet(new Set(cached.deniedPermissionIds || []));
       setIsLoadingPerms(false);
     } else {
       setIsLoadingPerms(true);
@@ -374,6 +379,7 @@ export default function AdminUsersPage() {
           directMap.set(dp.permissionId, dp.dataScope || "OWN");
         });
         setDirectPermsMap(directMap);
+        setDeniedPermsSet(new Set(json.data.deniedPermissionIds || []));
       } else if (!userPermCache.current.has(user.id)) {
         toast.error(json.error?.message || "Không thể tải thông tin phân quyền tài khoản.");
       }
@@ -386,15 +392,38 @@ export default function AdminUsersPage() {
     }
   }
 
-  // Toggle phân quyền riêng cho user
-  function handleToggleDirectPerm(permId: string) {
-    const nextMap = new Map(directPermsMap);
-    if (nextMap.has(permId)) {
-      nextMap.delete(permId);
+  // Toggle phân quyền cho user: Cho phép bỏ quyền kế thừa từ vai trò hoặc cấp thêm quyền riêng
+  function handleTogglePerm(permId: string) {
+    const isInherited = userPermDetail?.inheritedPermissionIds.includes(permId) || false;
+    const isDirect = directPermsMap.has(permId);
+    const isDenied = deniedPermsSet.has(permId);
+    const isCurrentlyChecked = (isInherited && !isDenied) || isDirect;
+
+    const nextDirect = new Map(directPermsMap);
+    const nextDenied = new Set(deniedPermsSet);
+
+    if (isCurrentlyChecked) {
+      // Đang có quyền -> Bấm vào để BỎ QUYỀN (uncheck)
+      if (isDirect) {
+        nextDirect.delete(permId);
+      }
+      if (isInherited) {
+        // Đánh dấu bỏ quyền đối với quyền thừa kế từ Vai trò
+        nextDenied.add(permId);
+      }
     } else {
-      nextMap.set(permId, "OWN");
+      // Đang không có quyền -> Bấm vào để CẤP LẠI QUYỀN (check)
+      if (isInherited) {
+        // Gỡ bỏ khỏi danh sách bỏ quyền để phục hồi quyền từ vai trò
+        nextDenied.delete(permId);
+      } else {
+        // Quyền không nằm trong vai trò -> Cấp quyền riêng
+        nextDirect.set(permId, "OWN");
+      }
     }
-    setDirectPermsMap(nextMap);
+
+    setDirectPermsMap(nextDirect);
+    setDeniedPermsSet(nextDenied);
   }
 
   // Thay đổi DataScope của quyền riêng
@@ -409,22 +438,24 @@ export default function AdminUsersPage() {
     if (!userPermDetail) return;
     const nextMap = new Map<string, string>();
     userPermDetail.allPermissions.forEach((p) => {
-      // Chỉ cấp quyền riêng cho các quyền chưa có trong vai trò
+      // Cấp quyền riêng cho các quyền chưa có trong vai trò
       if (!userPermDetail.inheritedPermissionIds.includes(p.id)) {
         nextMap.set(p.id, "OWN");
       }
     });
     setDirectPermsMap(nextMap);
-    toast.info("Đã chọn cấp tất cả các quyền còn thiếu cho tài khoản.");
+    setDeniedPermsSet(new Set()); // Bỏ mọi hạn chế bỏ quyền
+    toast.info("Đã chọn cấp tất cả quyền cho tài khoản.");
   }
 
-  // Xóa toàn bộ quyền riêng
+  // Xóa toàn bộ quyền riêng & Khôi phục theo vai trò
   function handleClearDirectPerms() {
     setDirectPermsMap(new Map());
-    toast.info("Đã khôi phục quyền mặc định hoàn toàn theo Vai trò.");
+    setDeniedPermsSet(new Set());
+    toast.info("Đã khôi phục toàn bộ quyền mặc định theo Vai trò.");
   }
 
-  // Lưu phân quyền riêng cho người dùng
+  // Lưu phân quyền cho người dùng
   async function handleSaveUserPermissions() {
     if (!selectedUser) return;
     try {
@@ -437,7 +468,10 @@ export default function AdminUsersPage() {
       const res = await fetch(`/api/admin/users/${selectedUser.id}/permissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ permissions: permissionsPayload }),
+        body: JSON.stringify({
+          permissions: permissionsPayload,
+          deniedPermissionIds: Array.from(deniedPermsSet),
+        }),
       });
 
       const json = await res.json();
@@ -657,14 +691,30 @@ export default function AdminUsersPage() {
           {icon}
           {label}
         </span>
-        {user.userPermissions && user.userPermissions.length > 0 && (
-          <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200"
-            title={`${user.userPermissions.length} quyền riêng được cấp trực tiếp`}
-          >
-            <Sparkles className="h-2.5 w-2.5" />+{user.userPermissions.length} quyền riêng
-          </span>
-        )}
+        {(() => {
+          const grantedCount = user.userPermissions?.filter((up) => !up.isDenied).length || 0;
+          const deniedCount = user.userPermissions?.filter((up) => up.isDenied).length || 0;
+          return (
+            <>
+              {grantedCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200"
+                  title={`${grantedCount} quyền riêng được cấp trực tiếp`}
+                >
+                  <Sparkles className="h-2.5 w-2.5" />+{grantedCount} quyền riêng
+                </span>
+              )}
+              {deniedCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700 border border-rose-200"
+                  title={`${deniedCount} quyền từ vai trò bị bỏ cho tài khoản này`}
+                >
+                  -{deniedCount} đã bỏ
+                </span>
+              )}
+            </>
+          );
+        })()}
       </div>
     );
   }
@@ -775,10 +825,12 @@ export default function AdminUsersPage() {
     userPermDetail.allPermissions.forEach((p) => {
       const isInherited = userPermDetail.inheritedPermissionIds.includes(p.id);
       const isDirect = directPermsMap.has(p.id);
+      const isDenied = deniedPermsSet.has(p.id);
 
       // Bộ lọc trạng thái
       if (permFilter === "DIRECT" && !isDirect) return;
-      if (permFilter === "INHERITED" && !isInherited) return;
+      if (permFilter === "INHERITED" && (!isInherited || isDenied)) return;
+      if (permFilter === "DENIED" && !isDenied) return;
 
       // Tìm kiếm từ khóa
       if (q) {
@@ -795,7 +847,7 @@ export default function AdminUsersPage() {
     });
 
     return result;
-  }, [userPermDetail, permSearch, permFilter, directPermsMap]);
+  }, [userPermDetail, permSearch, permFilter, directPermsMap, deniedPermsSet]);
 
   // Nhóm permissions theo module cho Tab Role Matrix
   const matrixPermsByModule = useMemo(() => {
@@ -1091,6 +1143,12 @@ export default function AdminUsersPage() {
                     </strong>{" "}
                     quyền • Được cấp riêng:{" "}
                     <strong className="text-indigo-600">{directPermsMap.size}</strong> quyền
+                    {deniedPermsSet.size > 0 && (
+                      <>
+                        {" • "}Đã bỏ quyền:{" "}
+                        <strong className="text-rose-600 font-semibold">{deniedPermsSet.size}</strong> quyền
+                      </>
+                    )}
                   </p>
                 </div>
 
@@ -1109,7 +1167,7 @@ export default function AdminUsersPage() {
                     onClick={handleClearDirectPerms}
                     className="text-xs h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                   >
-                    Xóa quyền riêng
+                    Khôi phục theo vai trò
                   </Button>
                 </div>
               </div>
@@ -1128,7 +1186,7 @@ export default function AdminUsersPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                 <button
                   onClick={() => setPermFilter("ALL")}
                   className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
@@ -1157,8 +1215,20 @@ export default function AdminUsersPage() {
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  Từ vai trò ({userPermDetail?.inheritedPermissionIds.length || 0})
+                  Từ vai trò ({userPermDetail ? userPermDetail.inheritedPermissionIds.filter((id) => !deniedPermsSet.has(id)).length : 0})
                 </button>
+                {deniedPermsSet.size > 0 && (
+                  <button
+                    onClick={() => setPermFilter("DENIED")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                      permFilter === "DENIED"
+                        ? "bg-rose-600 text-white"
+                        : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+                    }`}
+                  >
+                    Đã bỏ quyền ({deniedPermsSet.size})
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1180,41 +1250,47 @@ export default function AdminUsersPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
                       {perms.map((p) => {
-                        const isInherited = userPermDetail?.inheritedPermissionIds.includes(p.id);
+                        const isInherited = userPermDetail?.inheritedPermissionIds.includes(p.id) || false;
                         const isDirect = directPermsMap.has(p.id);
-                        const isChecked = isInherited || isDirect;
+                        const isDenied = deniedPermsSet.has(p.id);
+                        const isChecked = (isInherited && !isDenied) || isDirect;
                         const currentScope = directPermsMap.get(p.id) || "OWN";
 
                         return (
                           <div
                             key={p.id}
                             className={`p-3 rounded border transition-all ${
-                              isDirect
+                              isDenied
+                                ? "bg-rose-50/50 border-rose-300"
+                                : isDirect
                                 ? "bg-indigo-50/70 border-indigo-300 shadow-2xs"
-                                : isInherited
+                                : isChecked
                                 ? "bg-slate-50/80 border-slate-200"
                                 : "bg-white border-slate-200 hover:border-slate-300"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div
-                                onClick={() => {
-                                  // Nếu quyền đã có trong vai trò, không bắt buộc gán thêm trừ khi muốn override
-                                  handleToggleDirectPerm(p.id);
-                                }}
+                                onClick={() => handleTogglePerm(p.id)}
                                 className="flex items-start gap-2.5 cursor-pointer flex-1 select-none"
                               >
                                 <div className="mt-0.5 shrink-0">
-                                  {isDirect ? (
-                                    <CheckSquare className="h-4 w-4 text-indigo-600" />
-                                  ) : isInherited ? (
-                                    <CheckSquare className="h-4 w-4 text-purple-600" />
+                                  {isChecked ? (
+                                    isDirect ? (
+                                      <CheckSquare className="h-4 w-4 text-indigo-600" />
+                                    ) : (
+                                      <CheckSquare className="h-4 w-4 text-purple-600" />
+                                    )
                                   ) : (
-                                    <Square className="h-4 w-4 text-slate-400" />
+                                    <Square className={`h-4 w-4 ${isDenied ? "text-rose-400" : "text-slate-400"}`} />
                                   )}
                                 </div>
                                 <div>
-                                  <span className="text-xs font-semibold text-slate-900 block">
+                                  <span
+                                    className={`text-xs font-semibold block ${
+                                      isDenied ? "text-rose-900 line-through decoration-rose-300" : "text-slate-900"
+                                    }`}
+                                  >
                                     {p.name}
                                   </span>
                                   <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
@@ -1225,7 +1301,15 @@ export default function AdminUsersPage() {
 
                               {/* Nhãn nguồn gốc quyền */}
                               <div className="shrink-0 flex flex-col items-end gap-1">
-                                {isInherited && (
+                                {isDenied && (
+                                  <span
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200"
+                                    title="Quyền này đã bị tước/bỏ cho tài khoản này"
+                                  >
+                                    Đã bỏ quyền
+                                  </span>
+                                )}
+                                {isInherited && !isDenied && (
                                   <span
                                     className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 border border-purple-200"
                                     title="Quyền này được kế thừa từ Vai trò của người dùng"
@@ -1276,7 +1360,11 @@ export default function AdminUsersPage() {
             <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
               <span className="text-xs text-slate-500">
                 Đã chọn <strong className="text-indigo-600">{directPermsMap.size}</strong> quyền riêng
-                cấp cho tài khoản này.
+                {deniedPermsSet.size > 0 && (
+                  <>
+                    , <strong className="text-rose-600">{deniedPermsSet.size}</strong> quyền bị bỏ
+                  </>
+                )} cho tài khoản này.
               </span>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setIsPermDrawerOpen(false)}>

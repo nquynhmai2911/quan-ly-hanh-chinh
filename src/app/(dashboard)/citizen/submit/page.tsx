@@ -230,8 +230,12 @@ export default function CitizenSubmitPage() {
       <div className="bg-indigo-900 text-white rounded-lg p-6">
         <h1 className="text-xl font-bold">Nộp văn bản đến qua dịch vụ công</h1>
         <p className="mt-2 text-sm text-indigo-100">
-          Hồ sơ được gửi đến văn thư để tiếp nhận, vào sổ và chuyển xử lý. Bạn
-          có thể theo dõi hồ sơ đã nộp ở bên dưới.
+          Hồ sơ được gửi đến cơ quan để Chuyên viên tiếp nhận, kiểm tra và xử lý. Bạn
+          có thể theo dõi tiến độ xử lý tại danh sách hồ sơ bên dưới hoặc tại mục{" "}
+          <Link href="/documents/incoming" className="underline font-semibold hover:text-white">
+            Văn bản đến (Hồ sơ của tôi)
+          </Link>
+          .
         </p>
       </div>
       {result ? (
@@ -543,12 +547,20 @@ export default function CitizenSubmitPage() {
         </form>
       ) : (
         <p>
-          Chức năng nộp hồ sơ dành cho tài khoản người dân. Văn thư tiếp nhận hồ
+          Chức năng nộp hồ sơ dành cho tài khoản người dân. Chuyên viên tiếp nhận hồ
           sơ trong danh sách văn bản đến.
         </p>
       )}
       <section className="bg-white border rounded-lg p-6 space-y-4">
-        <h2 className="font-bold">Hồ sơ đã nộp</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold">Hồ sơ đã nộp</h2>
+          <Link
+            href="/documents/incoming"
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 underline flex items-center gap-1"
+          >
+            Xem toàn bộ tại Văn bản đến &rarr;
+          </Link>
+        </div>
         {historyError && (
           <p role="alert" className="text-red-700">
             {historyError}

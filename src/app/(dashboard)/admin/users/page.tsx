@@ -167,6 +167,37 @@ export default function AdminUsersPage() {
   const [deniedPermsSet, setDeniedPermsSet] = useState<Set<string>>(new Set());
   const userPermCache = useRef<Map<string, UserPermissionDetail>>(new Map());
 
+  // Kiểm tra tài khoản hiện tại có quyền Quản trị hay không
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    fullName: string;
+    email: string;
+    roles: string[];
+    permissions: Record<string, string>;
+  } | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  async function checkCurrentUser() {
+    try {
+      setIsAuthChecking(true);
+      const res = await fetch("/api/auth/me");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setCurrentUser({
+          id: json.data.user.id,
+          fullName: json.data.user.fullName,
+          email: json.data.user.email,
+          roles: json.data.roles || [],
+          permissions: json.data.permissions || {},
+        });
+      }
+    } catch {
+      console.error("Lỗi khi kiểm tra phiên đăng nhập");
+    } finally {
+      setIsAuthChecking(false);
+    }
+  }
+
   // Form Thêm tài khoản mới
   const [addForm, setAddForm] = useState({
     employeeCode: "",
@@ -238,6 +269,7 @@ export default function AdminUsersPage() {
 
   // Tải danh mục 1 lần duy nhất khi mount
   useEffect(() => {
+    checkCurrentUser();
     loadCatalogs();
     if (typeof window !== "undefined") {
       const tabParam = new URLSearchParams(window.location.search).get("tab");
@@ -313,7 +345,11 @@ export default function AdminUsersPage() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        toast.error(json.error?.message || "Lưu phân quyền vai trò thất bại.");
+        if (res.status === 403) {
+          toast.error("Phiên đăng nhập không có quyền Quản trị. Vui lòng đăng xuất và đăng nhập bằng tài khoản Quản trị viên (admin@eoffice.local).");
+        } else {
+          toast.error(json.error?.message || "Lưu phân quyền vai trò thất bại.");
+        }
         return;
       }
 
@@ -476,7 +512,11 @@ export default function AdminUsersPage() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        toast.error(json.error?.message || "Lưu phân quyền tài khoản thất bại.");
+        if (res.status === 403) {
+          toast.error("Phiên đăng nhập không có quyền Quản trị. Vui lòng đăng xuất và đăng nhập bằng tài khoản Quản trị viên (admin@eoffice.local).");
+        } else {
+          toast.error(json.error?.message || "Lưu phân quyền tài khoản thất bại.");
+        }
         return;
       }
 
@@ -863,6 +903,51 @@ export default function AdminUsersPage() {
 
   const currentSelectedRole = matrixRoles.find((r) => r.id === selectedRoleId);
 
+  if (
+    !isAuthChecking &&
+    currentUser &&
+    !currentUser.roles.includes("ADMIN") &&
+    !currentUser.permissions["admin.role.manage"]
+  ) {
+    return (
+      <div className="p-8 max-w-xl mx-auto text-center bg-white rounded-xl border border-rose-200 shadow-sm mt-12">
+        <div className="h-14 w-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <Shield className="h-7 w-7" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">
+          Không có quyền Quản trị & Phân quyền
+        </h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Bạn đang đăng nhập bằng tài khoản{" "}
+          <strong className="text-slate-900">{currentUser.fullName}</strong> (
+          <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">{currentUser.email}</code>) với vai trò{" "}
+          <strong className="text-indigo-600">{currentUser.roles.join(", ")}</strong>.
+        </p>
+        <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded p-3 mb-6">
+          Chức năng Quản lý người dùng & Phân quyền chỉ dành riêng cho tài khoản <strong>Quản trị viên (ADMIN)</strong>.
+          Vui lòng đăng xuất và đăng nhập bằng tài khoản Quản trị viên để thực hiện phân quyền.
+        </p>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition-colors cursor-pointer"
+          >
+            Đăng xuất & Đăng nhập bằng Admin
+          </button>
+          <Link
+            href="/documents/incoming"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-medium text-sm transition-colors"
+          >
+            Về trang chủ
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* ── TOP HEADER ──────────────────────────────────────────────────────── */}
@@ -879,6 +964,12 @@ export default function AdminUsersPage() {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               DB Connected
             </span>
+            {currentUser?.roles.includes("ADMIN") && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <Crown className="h-3 w-3 text-amber-500 fill-amber-500" />
+                Admin: {currentUser.fullName}
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             Quản trị tài khoản & phân quyền tập trung: Phân quyền theo 4 vai trò chính (Quản trị viên, Lãnh đạo, Chuyên viên, Người dân) và Phân quyền trực tiếp cho từng Tài khoản cá nhân.

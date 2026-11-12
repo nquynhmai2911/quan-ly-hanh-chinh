@@ -47,12 +47,13 @@ export default function LoginPage() {
       toast.success(
         `Chào mừng ${result.data.user.fullName} đã đăng nhập thành công!`,
       );
-      router.push(
-        result.data.roles?.includes("CITIZEN")
-          ? "/citizen/submit"
-          : "/documents/incoming",
-      );
-      router.refresh();
+      const targetUrl = result.data.roles?.includes("CITIZEN")
+        ? "/citizen/submit"
+        : result.data.roles?.includes("ADMIN")
+        ? "/admin/users"
+        : "/documents/incoming";
+      // Chuyển hướng toàn diện để khởi tạo đầy đủ phiên làm việc mới
+      window.location.href = targetUrl;
     } catch {
       toast.error("Không thể kết nối đến máy chủ.");
     } finally {

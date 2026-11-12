@@ -52,8 +52,8 @@ export function Header({
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       toast.success("Đã đăng xuất khỏi hệ thống.");
-      router.push("/login");
-      router.refresh();
+      // Tải lại hoàn toàn trang để xóa sạch bộ nhớ tạm của tài khoản cũ
+      window.location.href = "/login";
     } catch {
       toast.error("Lỗi khi đăng xuất.");
     }

@@ -397,7 +397,10 @@ export default function CitizenSubmitPage() {
                 <span className="text-[11px] text-slate-500 italic">Khổ giấy mô phỏng A4</span>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded p-6 shadow-xs font-serif text-slate-900 text-xs md:text-sm space-y-4">
+              <div
+                style={{ fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif' }}
+                className="bg-white border border-slate-200/90 rounded-lg p-6 shadow-xs text-slate-800 text-xs md:text-sm space-y-4"
+              >
                 <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-200">
                   <div className="text-center font-sans">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
@@ -420,7 +423,7 @@ export default function CitizenSubmitPage() {
                       Độc lập - Tự do - Hạnh phúc
                     </p>
                     <div className="w-28 border-b-2 border-slate-800 mx-auto my-1.5" />
-                    <p className="text-xs italic text-slate-600 font-serif">
+                    <p className="text-xs italic text-slate-500">
                       Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
                     </p>
                   </div>

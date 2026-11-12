@@ -2,7 +2,7 @@
 // Layout Server Component nạp AuthContext và truyền vào DashboardShell
 
 import React from "react";
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentUser, clearSessionCookie } from "@/lib/auth/session";
 import { getAuthContext } from "@/lib/auth/context";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "./dashboard-shell";
@@ -20,7 +20,12 @@ export default async function DashboardLayout({
 
   const authContext = await getAuthContext(user.id);
 
-  if (!authContext) redirect("/login?reauth=1");
+  if (!authContext) {
+    try {
+      await clearSessionCookie();
+    } catch {}
+    redirect("/login?reauth=1");
+  }
 
   return (
     <DashboardShell

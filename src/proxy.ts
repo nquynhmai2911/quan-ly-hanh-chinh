@@ -39,7 +39,12 @@ export async function proxy(request: NextRequest) {
 
   // 1. Trang Login
   if (pathname === "/login") {
-    if (isAuthenticated && !request.nextUrl.searchParams.has("reauth")) {
+    if (request.nextUrl.searchParams.has("reauth")) {
+      const response = NextResponse.next();
+      response.cookies.delete(SESSION_COOKIE_NAME);
+      return response;
+    }
+    if (isAuthenticated) {
       return NextResponse.redirect(new URL("/documents/incoming", request.url));
     }
     return NextResponse.next();

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "test:workflow": "node --env-file=.env tests/incoming-workflow.mjs && node --env-file=.env tests/other-modules.mjs"

@@ -27,6 +27,7 @@ import {
   Bell,
   History,
   UploadCloud,
+  FileStack,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -137,10 +138,10 @@ export function Sidebar({
     }))
     .filter((section) => section.items.length);
   const adminItems = [
-    { name: "Người dùng & Nhân sự", href: "/admin/users", icon: Users },
+    { name: "Phân quyền người dùng", href: "/admin/users", icon: ShieldCheck },
     { name: "Cây Đơn vị / Phòng ban", href: "/admin/units", icon: Building2 },
     { name: "Chức danh", href: "/admin/positions", icon: Briefcase },
-    { name: "Phân quyền & Vai trò", href: "/admin/roles", icon: ShieldCheck },
+    { name: "Loại hồ sơ & Độ khẩn", href: "/admin/document-types", icon: FileStack },
     { name: "Cấu hình Sổ văn bản", href: "/admin/books", icon: BookOpen },
     { name: "Nhật ký hệ thống", href: "/admin/audit-logs", icon: History },
   ];
@@ -212,6 +213,7 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   title={isCollapsed ? item.name : undefined}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition-colors group relative",
@@ -259,12 +261,15 @@ export function Sidebar({
 
             {(adminOpen || isCollapsed) &&
               adminItems.map((item) => {
-                const isActive = pathname.startsWith(item.href);
+                const isActive =
+                  pathname.startsWith(item.href) ||
+                  (item.href === "/admin/users" && pathname.startsWith("/admin/roles"));
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     title={isCollapsed ? item.name : undefined}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition-colors group relative",

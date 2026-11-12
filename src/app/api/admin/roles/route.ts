@@ -13,9 +13,20 @@ export async function GET() {
   try {
     await requirePermission(Permissions.ADMIN_ROLE_MANAGE);
 
+    // Hệ thống tối ưu hóa 4 vai trò chính: admin, Lãnh đạo, Chuyên viên, Văn thư
+    const TARGET_ROLE_CODES = ["ADMIN", "LEADER", "SPECIALIST", "CLERK"];
+    const ROLE_SORT_ORDER: Record<string, number> = {
+      ADMIN: 1,
+      LEADER: 2,
+      SPECIALIST: 3,
+      CLERK: 4,
+    };
+
     const [roles, permissions] = await Promise.all([
       prisma.role.findMany({
-        orderBy: { code: "asc" },
+        where: {
+          code: { in: TARGET_ROLE_CODES },
+        },
         include: {
           permissions: {
             select: { permissionId: true },
@@ -27,6 +38,9 @@ export async function GET() {
         orderBy: [{ module: "asc" }, { code: "asc" }],
       }),
     ]);
+
+    // Sắp xếp đúng theo thứ tự ưu tiên: Admin -> Lãnh đạo -> Chuyên viên -> Văn thư
+    roles.sort((a, b) => (ROLE_SORT_ORDER[a.code] || 99) - (ROLE_SORT_ORDER[b.code] || 99));
 
     return successResponse({ roles, permissions });
   } catch (error) {

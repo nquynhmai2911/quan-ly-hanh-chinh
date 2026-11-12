@@ -93,6 +93,7 @@ model User {
   auditLogs             AuditLog[]          @relation("AuditActor")
   receivedNotifications Notification[]      @relation("NotificationRecipient")
   sentNotifications     Notification[]      @relation("NotificationActor")
+  userPermissions       UserPermission[]
 
   @@index([email])
   @@index([employeeCode])
@@ -159,7 +160,8 @@ model Permission {
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
-  roles RolePermission[]
+  roles           RolePermission[]
+  userPermissions UserPermission[]
 
   @@index([module])
   @@map("permissions")
@@ -185,6 +187,23 @@ model RolePermission {
 
   @@unique([roleId, permissionId])
   @@map("role_permissions")
+}
+
+/// Gán quyền trực tiếp cho từng tài khoản người dùng (ngoài các quyền được thừa hưởng từ Vai trò)
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String     @map("user_id")
+  permissionId String     @map("permission_id")
+  dataScope    DataScope? @default(OWN) @map("data_scope")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+  @@map("user_permissions")
 }
 
 /// Gán vai trò cho UserPosition (quyền theo chức vụ), kèm Data Scope
@@ -792,4 +811,16 @@ model PendingUpload {
 
   @@index([uploaderId, fileKey])
   @@map("pending_uploads")
+}
+
+/// Cấu hình hệ thống (Key-Value)
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   /// JSON string hoặc text
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }

@@ -22,9 +22,9 @@ const QUICK_ACTIONS: QuickItem[] = [
   { id: "4", title: "Tạo dự thảo Văn bản đi mới", category: "Văn bản", href: "/documents/outgoing/new", icon: <Send className="h-4 w-4" /> },
   { id: "5", title: "Hồ sơ công việc / Lưu trữ", category: "Lưu trữ", href: "/archives", icon: <Archive className="h-4 w-4" /> },
   { id: "6", title: "Sổ văn bản", category: "Danh mục", href: "/catalogs/books", icon: <BookOpen className="h-4 w-4" /> },
-  { id: "7", title: "Quản lý Người dùng & Nhân sự", category: "Quản trị", href: "/admin/users", icon: <Users className="h-4 w-4" /> },
+  { id: "7", title: "Phân quyền người dùng (Tài khoản & Vai trò)", category: "Quản trị", href: "/admin/users", icon: <ShieldCheck className="h-4 w-4" /> },
   { id: "8", title: "Cây đơn vị & Phòng ban", category: "Quản trị", href: "/admin/units", icon: <Building className="h-4 w-4" /> },
-  { id: "9", title: "Phân quyền & Vai trò", category: "Quản trị", href: "/admin/roles", icon: <ShieldCheck className="h-4 w-4" /> },
+  { id: "9", title: "Cấu hình Loại hồ sơ & Độ khẩn", category: "Quản trị", href: "/admin/document-types", icon: <FileText className="h-4 w-4" /> },
   { id: "10", title: "Đổi mật khẩu tài khoản", category: "Cá nhân", href: "/profile/change-password", icon: <Key className="h-4 w-4" /> },
 ];
 

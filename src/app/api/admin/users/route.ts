@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       parseInt(searchParams.get("pageSize") || "20", 10),
     );
     const search = searchParams.get("search")?.trim() || "";
+    const role = searchParams.get("role")?.trim() || "";
 
     const where: Record<string, unknown> = {};
     if (search) {
@@ -33,6 +34,14 @@ export async function GET(request: NextRequest) {
         { email: { contains: search, mode: "insensitive" } },
         { employeeCode: { contains: search, mode: "insensitive" } },
       ];
+    }
+    if (role) {
+      where.positions = {
+        some: {
+          endedAt: null,
+          roles: { some: { role: { code: role } } },
+        },
+      };
     }
 
     const [total, users] = await Promise.all([
@@ -61,6 +70,21 @@ export async function GET(request: NextRequest) {
                 select: {
                   role: { select: { id: true, name: true, code: true } },
                   dataScope: true,
+                },
+              },
+            },
+          },
+          userPermissions: {
+            select: {
+              id: true,
+              permissionId: true,
+              dataScope: true,
+              permission: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  module: true,
                 },
               },
             },

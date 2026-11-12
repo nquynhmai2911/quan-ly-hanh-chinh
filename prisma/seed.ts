@@ -17,12 +17,10 @@ async function main() {
 
   // ── 1. Chức danh ──────────────────────────────────────────────────────────
   const positionsData = [
-    { name: "Giám đốc", level: 0 },
-    { name: "Phó Giám đốc", level: 1 },
-    { name: "Trưởng phòng", level: 2 },
-    { name: "Phó Trưởng phòng", level: 3 },
-    { name: "Chuyên viên", level: 4 },
-    { name: "Văn thư", level: 5 },
+    { name: "Quản trị hệ thống", level: 0 },
+    { name: "Lãnh đạo", level: 1 },
+    { name: "Chuyên viên", level: 2 },
+    { name: "Văn thư", level: 3 },
   ];
 
   const positions: Record<string, string> = {};
@@ -253,18 +251,26 @@ async function main() {
       "admin.system",
       "catalog.view",
       "catalog.manage",
+      "archive.view",
+      "archive.manage",
+      "notification.view",
     ],
     LEADER: [
       "doc.incoming.view",
       "doc.incoming.annotate",
       "doc.incoming.forward",
+      "doc.incoming.assign",
+      "doc.incoming.process",
+      "doc.incoming.complete",
       "doc.outgoing.view",
+      "doc.outgoing.review",
       "doc.outgoing.approve",
       "doc.outgoing.sign",
       "doc.outgoing.recall",
       "doc.outgoing.replace",
       "doc.outgoing.cancel",
       "catalog.view",
+      "archive.view",
       "notification.view",
     ],
     DEPT_HEAD: [
@@ -282,10 +288,13 @@ async function main() {
       "doc.incoming.create",
       "doc.incoming.register",
       "doc.incoming.forward",
+      "doc.incoming.complete",
       "doc.outgoing.view",
       "doc.outgoing.number",
       "doc.outgoing.issue",
       "catalog.view",
+      "archive.view",
+      "archive.manage",
       "notification.view",
     ],
     CITIZEN: ["notification.view"],
@@ -444,13 +453,13 @@ async function main() {
     },
   });
 
-  // Gán admin vào đơn vị gốc, chức danh Chuyên viên (placeholder)
+  // Gán admin vào đơn vị gốc, chức danh Quản trị hệ thống
   const adminPosition = await prisma.userPosition.upsert({
     where: {
       userId_unitId_positionId_startedAt: {
         userId: adminUser.id,
         unitId: rootUnit.id,
-        positionId: positions["Chuyên viên"],
+        positionId: positions["Quản trị hệ thống"],
         startedAt: new Date("2024-01-01"),
       },
     },
@@ -458,7 +467,7 @@ async function main() {
     create: {
       userId: adminUser.id,
       unitId: rootUnit.id,
-      positionId: positions["Chuyên viên"],
+      positionId: positions["Quản trị hệ thống"],
       isPrimary: true,
       startedAt: new Date("2024-01-01"),
     },
@@ -488,14 +497,14 @@ async function main() {
       email: "nguoidan@eoffice.local",
       positionName: "Chuyên viên",
       unitCode: "CQ",
-      roleCode: "CITIZEN",
+      roleCode: "SPECIALIST",
       dataScope: DataScope.OWN,
     },
     {
       employeeCode: "GD001",
       fullName: "Nguyễn Văn An",
       email: "giamdoc@eoffice.local",
-      positionName: "Giám đốc",
+      positionName: "Lãnh đạo",
       unitCode: "CQ",
       roleCode: "LEADER",
       dataScope: DataScope.ALL,
@@ -504,9 +513,9 @@ async function main() {
       employeeCode: "TP001",
       fullName: "Trần Thị Bình",
       email: "truongphong.tchc@eoffice.local",
-      positionName: "Trưởng phòng",
+      positionName: "Lãnh đạo",
       unitCode: "TCHC",
-      roleCode: "DEPT_HEAD",
+      roleCode: "LEADER",
       dataScope: DataScope.UNIT_TREE,
     },
     {

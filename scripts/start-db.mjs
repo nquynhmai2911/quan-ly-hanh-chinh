@@ -4,7 +4,8 @@ import fs from "fs";
 
 async function main() {
   console.log("Initializing embedded PostgreSQL...");
-  const dataDir = path.resolve(".embedded-pg-data");
+  const homeDir = process.env.USERPROFILE || process.env.HOME || ".";
+  const dataDir = process.env.EMBEDDED_PG_DATA_DIR || path.join(homeDir, ".eoffice-embedded-pg-data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -36,6 +37,20 @@ async function main() {
   }
 
   console.log("Ready! PostgreSQL is running.");
+
+  // Keep node process running continuously
+  setInterval(() => {}, 1000 * 60 * 60);
+
+  process.on("SIGINT", async () => {
+    console.log("Stopping PostgreSQL...");
+    try { await pg.stop(); } catch {}
+    process.exit(0);
+  });
+  process.on("SIGTERM", async () => {
+    console.log("Stopping PostgreSQL...");
+    try { await pg.stop(); } catch {}
+    process.exit(0);
+  });
 }
 
 main().catch((err) => {

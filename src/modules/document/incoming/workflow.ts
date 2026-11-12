@@ -65,8 +65,11 @@ export function incomingActions(
     hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ANNOTATE) &&
     (isAdmin(ctx) || doc.workflow?.leaderId === ctx.userId);
   const head =
-    hasRolePermission(ctx, "DEPT_HEAD", Permissions.INCOMING_ASSIGN) &&
-    (isAdmin(ctx) || doc.workflow?.headId === ctx.userId);
+    (hasRolePermission(ctx, "DEPT_HEAD", Permissions.INCOMING_ASSIGN) ||
+      hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ASSIGN)) &&
+    (isAdmin(ctx) ||
+      doc.workflow?.headId === ctx.userId ||
+      doc.workflow?.leaderId === ctx.userId);
   if (
     doc.status === "SUBMITTED" &&
     hasRolePermission(ctx, "CLERK", Permissions.INCOMING_REGISTER)
@@ -197,7 +200,17 @@ export async function requireRecipient(
           unitId,
           unit: { isActive: true },
           position: { isActive: true },
-          roles: { some: { role: { code: role, isActive: true } } },
+          roles: {
+            some: {
+              role: {
+                code:
+                  role === "DEPT_HEAD"
+                    ? { in: ["DEPT_HEAD", "LEADER"] }
+                    : role,
+                isActive: true,
+              },
+            },
+          },
         },
       },
     },

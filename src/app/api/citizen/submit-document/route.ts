@@ -15,13 +15,7 @@ const schema = z.object({
   senderAddress: z.string().max(500).optional(),
   title: z.string().trim().min(5).max(1000),
   note: z.string().max(1000).optional(),
-  docType: z.enum([
-    "Đơn kiến nghị / Phản ánh",
-    "Đơn đề nghị giải quyết thủ tục",
-    "Công văn đề xuất",
-    "Báo cáo tình hình",
-    "Khác",
-  ]),
+  docType: z.string().trim().min(1, "Vui lòng chọn hoặc nhập loại hồ sơ"),
   urgency: z.enum(["NORMAL", "URGENT", "FIRE"]).default("NORMAL"),
   attachments: z
     .array(z.object({ uploadId: z.string().min(1) }))
@@ -47,14 +41,41 @@ export async function POST(request: NextRequest) {
       const files = [];
       for (const ref of body.attachments)
         files.push(await claimUpload(tx, ctx.userId, ref));
-      const type = await tx.documentType.findUnique({
-        where: { code: body.docType === "Báo cáo tình hình" ? "BC" : "CV" },
+      // Tìm loại hồ sơ khớp theo ID, Tên hoặc Ký hiệu
+      let type = await tx.documentType.findFirst({
+        where: {
+          isActive: true,
+          OR: [
+            { id: body.docType },
+            { name: body.docType },
+            { code: body.docType },
+          ],
+        },
       });
-      if (!type)
+
+      // Nếu không khớp trực tiếp, ưu tiên loại CV hoặc loại hoạt động đầu tiên
+      if (!type) {
+        type = await tx.documentType.findFirst({
+          where: {
+            isActive: true,
+            code: body.docType === "Báo cáo tình hình" ? "BC" : "CV",
+          },
+        });
+      }
+
+      if (!type) {
+        type = await tx.documentType.findFirst({
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+        });
+      }
+
+      if (!type) {
         throw new BusinessError(
           "CONFLICT",
-          "Chưa cấu hình loại văn bản. Vui lòng liên hệ văn thư.",
+          "Chưa cấu hình loại văn bản trên hệ thống. Vui lòng liên hệ quản trị viên.",
         );
+      }
       const onlineCode = `DTT-${new Date().getFullYear()}-${randomUUID().slice(0, 13).toUpperCase()}`;
       const doc = await tx.document.create({
         data: {

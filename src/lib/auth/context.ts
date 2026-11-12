@@ -44,26 +44,29 @@ export async function getAuthContext(
     return cached.data;
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId, isActive: true },
-    include: {
-      positions: {
-        where: {
-          startedAt: { lte: new Date() },
-          OR: [{ endedAt: null }, { endedAt: { gt: new Date() } }],
-          unit: { isActive: true },
-          position: { isActive: true },
-        },
-        include: {
-          unit: true,
-          position: true,
-          roles: {
-            include: {
-              role: {
-                include: {
-                  permissions: {
-                    include: {
-                      permission: true,
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId, isActive: true },
+      include: {
+        positions: {
+          where: {
+            startedAt: { lte: new Date() },
+            OR: [{ endedAt: null }, { endedAt: { gt: new Date() } }],
+            unit: { isActive: true },
+            position: { isActive: true },
+          },
+          include: {
+            unit: true,
+            position: true,
+            roles: {
+              include: {
+                role: {
+                  include: {
+                    permissions: {
+                      include: {
+                        permission: true,
+                      },
                     },
                   },
                 },
@@ -71,9 +74,17 @@ export async function getAuthContext(
             },
           },
         },
+        userPermissions: {
+          include: {
+            permission: true,
+          },
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error("Lỗi khi tải Auth Context từ CSDL:", error);
+    return null;
+  }
   if (!user) {
     return null;
   }
@@ -113,6 +124,22 @@ export async function getAuthContext(
         ) {
           permissionsMap.set(permCode, roleScope);
         }
+      }
+    }
+  }
+
+  // 3. Gom quyền cấp riêng cho từng tài khoản (UserPermission)
+  if (user.userPermissions && user.userPermissions.length > 0) {
+    for (const up of user.userPermissions) {
+      const permCode = up.permission.code;
+      const userScope = (up.dataScope || "OWN") as DataScope;
+      const currentScope = permissionsMap.get(permCode);
+
+      if (
+        !currentScope ||
+        SCOPE_WEIGHT[userScope] > SCOPE_WEIGHT[currentScope]
+      ) {
+        permissionsMap.set(permCode, userScope);
       }
     }
   }

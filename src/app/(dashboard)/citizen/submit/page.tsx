@@ -37,6 +37,7 @@ export default function CitizenSubmitPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [historyError, setHistoryError] = useState("");
   const [canSubmit, setCanSubmit] = useState(false);
+  const [availableTypes, setAvailableTypes] = useState<Array<{ id: string; name: string; code: string }>>([]);
   async function loadHistory() {
     try {
       const json = await (await fetch("/api/citizen/submit-document")).json();
@@ -63,6 +64,19 @@ export default function CitizenSubmitPage() {
           }));
         }
       });
+    fetch("/api/catalogs/document-types")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && Array.isArray(j.data) && j.data.length > 0) {
+          setAvailableTypes(j.data);
+          setForm((prev) => {
+            const hasMatch = j.data.some((t: { name: string }) => t.name === prev.docType);
+            return hasMatch ? prev : { ...prev, docType: j.data[0].name };
+          });
+        }
+      })
+      .catch(() => {});
+
     const controller = new AbortController();
     fetch("/api/citizen/submit-document", { signal: controller.signal })
       .then((r) => r.json())
@@ -233,15 +247,23 @@ export default function CitizenSubmitPage() {
                 value={form.docType}
                 onChange={(e) => setForm({ ...form, docType: e.target.value })}
               >
-                {[
-                  "Đơn kiến nghị / Phản ánh",
-                  "Đơn đề nghị giải quyết thủ tục",
-                  "Công văn đề xuất",
-                  "Báo cáo tình hình",
-                  "Khác",
-                ].map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
+                {availableTypes.length > 0
+                  ? availableTypes.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} ({t.code})
+                      </option>
+                    ))
+                  : [
+                      "Đơn kiến nghị / Phản ánh",
+                      "Đơn đề nghị giải quyết thủ tục",
+                      "Công văn đề xuất",
+                      "Báo cáo tình hình",
+                      "Khác",
+                    ].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
               </select>
             </label>
             <label className="text-sm">

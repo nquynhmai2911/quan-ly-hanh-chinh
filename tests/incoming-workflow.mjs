@@ -55,7 +55,8 @@ async function login(email, password = "Demo@123") {
   return r.response.headers.get("set-cookie").split(";")[0];
 }
 async function temporaryUser(role, unitId) {
-  const roleRecord = await db.role.findUniqueOrThrow({ where: { code: role } });
+  const roleCode = role === "DEPT_HEAD" ? "LEADER" : role === "CLERK" ? "SPECIALIST" : role;
+  const roleRecord = await db.role.findUniqueOrThrow({ where: { code: roleCode } });
   const position = await db.position.findFirstOrThrow();
   const user = await db.user.create({
     data: {
@@ -89,11 +90,10 @@ const png = Buffer.from(
 );
 async function ensureStandardUsers() {
   const defaults = [
-    { email: "vanthu@eoffice.local", code: "VT001", name: "Lê Văn Cường", role: "CLERK", pos: "Văn thư", unit: "VP" },
-    { email: "giamdoc@eoffice.local", code: "GD001", name: "Nguyễn Văn An", role: "LEADER", pos: "Lãnh đạo", unit: "CQ" },
+    { email: "giamdoc@eoffice.local", code: "GD001", name: "Lãnh đạo Cơ quan", role: "LEADER", pos: "Lãnh đạo", unit: "CQ" },
     { email: "truongphong.tchc@eoffice.local", code: "TP001", name: "Trần Thị Bình", role: "LEADER", pos: "Lãnh đạo", unit: "TCHC" },
     { email: "chuyenvien.tchc@eoffice.local", code: "CV001", name: "Phạm Thị Dung", role: "SPECIALIST", pos: "Chuyên viên", unit: "TCHC" },
-    { email: "nguoidan@eoffice.local", code: "CD001", name: "Nguyễn Văn Dân", role: "CITIZEN", pos: "Chuyên viên", unit: "CQ" },
+    { email: "nguoidan@eoffice.local", code: "CD001", name: "Nguyễn Văn Dân", role: "CITIZEN", pos: "Người dân", unit: "CQ" },
   ];
   for (const d of defaults) {
     const existing = await db.user.findFirst({ where: { OR: [{ email: d.email }, { employeeCode: d.code }] } });
@@ -127,10 +127,10 @@ async function ensureStandardUsers() {
 try {
   await ensureStandardUsers();
   const citizen = await login("nguoidan@eoffice.local");
-  const clerk = await login("vanthu@eoffice.local");
+  const specialist = await login("chuyenvien.tchc@eoffice.local");
+  const clerk = specialist;
   const leader = await login("giamdoc@eoffice.local");
   const head = await login("truongphong.tchc@eoffice.local");
-  const specialist = await login("chuyenvien.tchc@eoffice.local");
   const admin = await login("admin@eoffice.local", "Admin@123");
   assert.equal(
     (

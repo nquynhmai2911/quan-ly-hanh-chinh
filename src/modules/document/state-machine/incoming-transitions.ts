@@ -1,29 +1,29 @@
 // src/modules/document/state-machine/incoming-transitions.ts
-// Bảng cấu hình chuyển trạng thái Văn bản đến (Quy trình Văn thư Một cửa)
+// Bảng cấu hình chuyển trạng thái Văn bản đến (Quy trình 4 vai trò chuẩn hóa)
 
 import { TransitionRule } from "./types";
 import { Permissions, SystemRoles } from "@/lib/constants";
 
 export const incomingTransitions: TransitionRule[] = [
-  // 1a. Văn thư chuyển thẳng cho Chuyên viên xử lý (theo quy trình một cửa trực tiếp)
+  // 1a. Chuyên viên hoặc Lãnh đạo chuyển phân công Chuyên viên xử lý
   {
     from: "RECEIVED",
     action: "CLERK_DISTRIBUTE",
     to: "PROCESSING",
-    allowedRoles: [SystemRoles.CLERK, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.SPECIALIST, SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_FORWARD,
     labelVi: "Chuyển Chuyên viên xử lý",
     isOptimisticAllowed: true,
     notifyTargetRole: [SystemRoles.SPECIALIST],
-    notifyTitleTemplate: "Văn thư đã phân công bạn xử lý văn bản đến",
+    notifyTitleTemplate: "Bạn được phân công xử lý văn bản đến",
   },
 
-  // 1b. Văn thư sau khi vào sổ trình Lãnh đạo cho ý kiến (đối với văn bản mật, đặc biệt hoặc xin chủ trương)
+  // 1b. Chuyên viên trình Lãnh đạo cho ý kiến chỉ đạo
   {
     from: "RECEIVED",
     action: "SUBMIT_LEADER",
     to: "PENDING_LEADER",
-    allowedRoles: [SystemRoles.CLERK, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.SPECIALIST, SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_FORWARD,
     labelVi: "Trình Lãnh đạo",
     isOptimisticAllowed: true,
@@ -40,11 +40,11 @@ export const incomingTransitions: TransitionRule[] = [
     requiredPermission: Permissions.INCOMING_ANNOTATE,
     labelVi: "Bút phê & Phân phối",
     isOptimisticAllowed: true,
-    notifyTargetRole: [SystemRoles.DEPT_HEAD],
+    notifyTargetRole: [SystemRoles.LEADER, SystemRoles.SPECIALIST],
     notifyTitleTemplate: "Văn bản đến có bút phê chỉ đạo từ Lãnh đạo",
   },
 
-  // 3. Lãnh đạo trả lại văn thư (ví dụ scan mờ, thiếu tài liệu, sai thẩm quyền)
+  // 3. Lãnh đạo trả lại (ví dụ hồ sơ chưa hợp lệ, thiếu tài liệu, sai thẩm quyền)
   {
     from: "PENDING_LEADER",
     action: "RETURN_CLERK",
@@ -52,18 +52,18 @@ export const incomingTransitions: TransitionRule[] = [
     allowedRoles: [SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_ANNOTATE,
     requiresReason: true,
-    labelVi: "Trả lại văn thư",
+    labelVi: "Trả lại bước trước",
     isOptimisticAllowed: true,
-    notifyTargetRole: [SystemRoles.CLERK],
+    notifyTargetRole: [SystemRoles.SPECIALIST],
     notifyTitleTemplate: "Lãnh đạo trả lại văn bản đến yêu cầu kiểm tra lại",
   },
 
-  // 4. Trưởng phòng phân công cho chuyên viên thụ lý
+  // 4. Lãnh đạo phụ trách phân công cho chuyên viên thụ lý
   {
     from: "DISTRIBUTED",
     action: "DEPT_HEAD_ASSIGN",
     to: "PROCESSING",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_ASSIGN,
     labelVi: "Phân công chuyên viên",
     isOptimisticAllowed: true,
@@ -71,26 +71,26 @@ export const incomingTransitions: TransitionRule[] = [
     notifyTitleTemplate: "Bạn được phân công xử lý văn bản đến",
   },
 
-  // 5. Trưởng phòng trả lại Lãnh đạo (nếu không thuộc chức năng nhiệm vụ phòng)
+  // 5. Lãnh đạo phụ trách trả lại Lãnh đạo chung (nếu không thuộc chức năng nhiệm vụ)
   {
     from: "DISTRIBUTED",
     action: "DEPT_HEAD_RETURN",
     to: "PENDING_LEADER",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_ASSIGN,
     requiresReason: true,
     labelVi: "Trả lại Lãnh đạo",
     isOptimisticAllowed: true,
     notifyTargetRole: [SystemRoles.LEADER],
-    notifyTitleTemplate: "Phòng ban đề xuất chuyển đơn vị khác thụ lý",
+    notifyTitleTemplate: "Đề xuất chuyển đơn vị khác thụ lý",
   },
 
-  // 6. Trình duyệt hoàn thành (Chuyên viên chủ trì báo cáo kết quả -> Trưởng phòng tổng hợp trình duyệt)
+  // 6. Trình duyệt hoàn thành (Chuyên viên chủ trì báo cáo kết quả -> Trình duyệt)
   {
     from: "PROCESSING",
     action: "SUBMIT_REVIEW",
     to: "PENDING_REVIEW",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.SPECIALIST, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.SPECIALIST, SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_PROCESS,
     labelVi: "Trình duyệt kết thúc",
     isOptimisticAllowed: true,
@@ -102,20 +102,20 @@ export const incomingTransitions: TransitionRule[] = [
       return true;
     },
     conditionDescriptionVi: "Tất cả chuyên viên chủ trì (MAIN) phải nộp báo cáo kết quả trước khi trình duyệt kết thúc",
-    notifyTargetRole: [SystemRoles.DEPT_HEAD, SystemRoles.LEADER],
+    notifyTargetRole: [SystemRoles.LEADER],
     notifyTitleTemplate: "Văn bản đến đang chờ xác nhận hoàn thành",
   },
 
-  // 7. Xác nhận hoàn thành văn bản đến
+  // 7. Lãnh đạo xác nhận hoàn thành văn bản đến
   {
     from: "PENDING_REVIEW",
     action: "APPROVE_COMPLETE",
     to: "COMPLETED",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.LEADER, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_COMPLETE,
     labelVi: "Xác nhận hoàn thành",
     isOptimisticAllowed: true,
-    notifyTargetRole: [SystemRoles.SPECIALIST, SystemRoles.CLERK],
+    notifyTargetRole: [SystemRoles.SPECIALIST, SystemRoles.CITIZEN],
     notifyTitleTemplate: "Văn bản đến đã được duyệt hoàn thành",
   },
 
@@ -124,7 +124,7 @@ export const incomingTransitions: TransitionRule[] = [
     from: "PENDING_REVIEW",
     action: "REJECT_REPORT",
     to: "PROCESSING",
-    allowedRoles: [SystemRoles.DEPT_HEAD, SystemRoles.LEADER, SystemRoles.ADMIN],
+    allowedRoles: [SystemRoles.LEADER, SystemRoles.ADMIN],
     requiredPermission: Permissions.INCOMING_COMPLETE,
     requiresReason: true,
     labelVi: "Yêu cầu bổ sung báo cáo",

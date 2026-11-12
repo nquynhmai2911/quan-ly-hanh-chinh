@@ -86,9 +86,7 @@ export default function IncomingDocumentsPage() {
             !roles.some((r: string) =>
               [
                 "ADMIN",
-                "CLERK",
                 "LEADER",
-                "DEPT_HEAD",
                 "SPECIALIST",
               ].includes(r),
             );

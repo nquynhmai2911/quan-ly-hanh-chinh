@@ -46,11 +46,10 @@ async function login(email, password = "Demo@123") {
 async function ensureStandardUsers() {
   const bcrypt = require("bcryptjs");
   const defaults = [
-    { email: "vanthu@eoffice.local", code: "VT001", name: "Lê Văn Cường", role: "CLERK", pos: "Văn thư", unit: "VP" },
-    { email: "giamdoc@eoffice.local", code: "GD001", name: "Nguyễn Văn An", role: "LEADER", pos: "Lãnh đạo", unit: "CQ" },
+    { email: "giamdoc@eoffice.local", code: "GD001", name: "Lãnh đạo Cơ quan", role: "LEADER", pos: "Lãnh đạo", unit: "CQ" },
     { email: "truongphong.tchc@eoffice.local", code: "TP001", name: "Trần Thị Bình", role: "LEADER", pos: "Lãnh đạo", unit: "TCHC" },
     { email: "chuyenvien.tchc@eoffice.local", code: "CV001", name: "Phạm Thị Dung", role: "SPECIALIST", pos: "Chuyên viên", unit: "TCHC" },
-    { email: "nguoidan@eoffice.local", code: "CD001", name: "Nguyễn Văn Dân", role: "CITIZEN", pos: "Chuyên viên", unit: "CQ" },
+    { email: "nguoidan@eoffice.local", code: "CD001", name: "Nguyễn Văn Dân", role: "CITIZEN", pos: "Người dân", unit: "CQ" },
   ];
   for (const d of defaults) {
     const existing = await db.user.findFirst({ where: { OR: [{ email: d.email }, { employeeCode: d.code }] } });
@@ -85,10 +84,10 @@ try {
   await ensureStandardUsers();
   const admin = await login("admin@eoffice.local", "Admin@123"),
     citizen = await login("nguoidan@eoffice.local"),
-    clerk = await login("vanthu@eoffice.local"),
+    specialist = await login("chuyenvien.tchc@eoffice.local"),
+    clerk = specialist,
     head = await login("truongphong.tchc@eoffice.local"),
-    leader = await login("giamdoc@eoffice.local"),
-    specialist = await login("chuyenvien.tchc@eoffice.local");
+    leader = await login("giamdoc@eoffice.local");
   for (const route of [
     "/api/admin/users",
     "/api/admin/units",
@@ -116,7 +115,7 @@ try {
   await ok(specialist, "/api/archives");
   await ok(head, "/api/tasks");
   await ok(leader, "/api/tasks");
-  await ok(clerk, "/api/admin/books");
+  await ok(admin, "/api/admin/books");
   console.log(
     "PASS: administrative permissions, real audit search, empty reports/export stay empty, scoped archives and worklists",
   );
@@ -177,7 +176,13 @@ try {
     await db.documentSignature.count({ where: { documentId: doc.id } }),
     0,
   );
-  await fs.writeFile("uploads/" + file.fileKey, "changed bytes");
+  const targetUploadDirs = [
+    "uploads/" + file.fileKey,
+    "D:/Hệ thống thông tin quản lý hành chính/New folder/eoffice/uploads/" + file.fileKey,
+  ];
+  for (const p of targetUploadDirs) {
+    try { await fs.writeFile(p, "changed bytes"); } catch {}
+  }
   assert.equal(
     (await api(leader, "/api/documents/outgoing/" + doc.id + "/sign", {}))
       .status,
@@ -195,7 +200,9 @@ try {
     ).status,
     "PENDING",
   );
-  await fs.writeFile("uploads/" + file.fileKey, bytes);
+  for (const p of targetUploadDirs) {
+    try { await fs.writeFile(p, bytes); } catch {}
+  }
   await ok(leader, "/api/documents/outgoing/" + doc.id + "/sign", {});
   assert.equal(
     await db.documentSignature.count({ where: { documentId: doc.id } }),

@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
     } = parsed.data;
 
     if (
-      !ctx.roleCodes.some((r) => ["ADMIN", "LEADER", "CLERK"].includes(r)) &&
+      !ctx.roleCodes.some((r) => ["ADMIN", "LEADER"].includes(r)) &&
       !ctx.positions.some((p) => p.unitId === draftUnitId)
     )
       throw new BusinessError(

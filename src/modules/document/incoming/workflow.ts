@@ -29,7 +29,7 @@ export const mayAttach = (ctx: AuthContext, doc: IncomingDocument) =>
   ((isCitizen(ctx) &&
     doc.creatorId === ctx.userId &&
     doc.status === "SUBMITTED") ||
-    (hasRolePermission(ctx, "CLERK", Permissions.INCOMING_CREATE) &&
+    ((ctx.permissions.has(Permissions.INCOMING_CREATE) || isAdmin(ctx)) &&
       ["SUBMITTED", "RECEIVED"].includes(doc.status)));
 export const mayReport = (ctx: AuthContext, doc: IncomingDocument) =>
   doc.status === "PROCESSING" &&
@@ -64,13 +64,13 @@ export function incomingActions(
     });
   const leader =
     hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ANNOTATE) &&
-    (isAdmin(ctx) || doc.workflow?.leaderId === ctx.userId);
+    (isAdmin(ctx) || doc.workflow?.leaderId === ctx.userId || !doc.workflow?.leaderId);
   const head =
-    (hasRolePermission(ctx, "DEPT_HEAD", Permissions.INCOMING_ASSIGN) ||
-      hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ASSIGN)) &&
+    hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ASSIGN) &&
     (isAdmin(ctx) ||
       doc.workflow?.headId === ctx.userId ||
-      doc.workflow?.leaderId === ctx.userId);
+      doc.workflow?.leaderId === ctx.userId ||
+      !doc.workflow?.headId);
 
   const isLeader =
     isAdmin(ctx) ||
@@ -246,7 +246,7 @@ export async function requireRecipient(
               role: {
                 code:
                   role === "DEPT_HEAD"
-                    ? { in: ["DEPT_HEAD", "LEADER", "SPECIALIST"] }
+                    ? { in: ["LEADER", "SPECIALIST"] }
                     : role,
                 isActive: true,
               },
@@ -383,14 +383,14 @@ export async function transitionIncoming(
         });
         if (defaultLeader) leaderId = defaultLeader.id;
       }
-      // Gán Trưởng phòng đơn vị
+      // Gán Lãnh đạo đơn vị phụ trách
       const unitHead = await tx.user.findFirst({
         where: {
           isActive: true,
           positions: {
             some: {
               unitId,
-              roles: { some: { role: { code: { in: ["LEADER", "DEPT_HEAD"] }, isActive: true } } },
+              roles: { some: { role: { code: "LEADER", isActive: true } } },
             },
           },
         },
@@ -467,7 +467,7 @@ export async function transitionIncoming(
       const head = await requireRecipient(
         tx,
         input.headId,
-        "DEPT_HEAD",
+        "LEADER",
         input.unitId,
       );
       await tx.incomingWorkflow.update({
@@ -477,7 +477,7 @@ export async function transitionIncoming(
       data.processingDeadline =
         input.processingDeadline || doc.processingDeadline;
       recipients = [head.id];
-      reason = `Giao trưởng phòng ${head.fullName}: ${reason}`;
+      reason = `Giao Lãnh đạo phụ trách ${head.fullName}: ${reason}`;
     } else if (input.action === "RETURN_CLERK") {
       recipients = [doc.workflow?.registrarId || doc.creatorId];
       if (doc.workflow)

@@ -378,7 +378,7 @@ export default function NewOutgoingDraftPage() {
               <input
                 type="text"
                 {...register("signerName")}
-                placeholder="VD: Nguyễn Văn An"
+                placeholder="VD: Lãnh đạo ký duyệt"
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
               />
             </div>
@@ -390,7 +390,7 @@ export default function NewOutgoingDraftPage() {
               <input
                 type="text"
                 {...register("signerPosition")}
-                placeholder="VD: Giám đốc"
+                placeholder="VD: Lãnh đạo đơn vị"
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-indigo-600 outline-none"
               />
             </div>

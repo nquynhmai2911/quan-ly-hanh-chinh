@@ -52,7 +52,7 @@ export function Sidebar({
   const citizenOnly =
     userRoles.includes("CITIZEN") &&
     !userRoles.some((r) =>
-      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+      ["ADMIN", "LEADER", "SPECIALIST"].includes(r),
     );
 
   const permSet = new Set(userPermissions);
@@ -84,7 +84,7 @@ export function Sidebar({
       title: "QUẢN LÝ VĂN BẢN",
       items: [
         {
-          name: "Văn bản đến",
+          name: citizenOnly ? "Hồ sơ của tôi" : "Văn bản đến",
           href: "/documents/incoming",
           icon: FileText,
           badge: null,
@@ -98,9 +98,16 @@ export function Sidebar({
           visible: canViewOutgoing,
         },
         {
-          name: "Nộp văn bản đến (Dịch vụ công)",
+          name: "Nộp hồ sơ trực tuyến",
           href: "/citizen/submit",
           icon: UploadCloud,
+          badge: null,
+          visible: canSubmitCitizen,
+        },
+        {
+          name: "Danh sách tờ trình",
+          href: "/citizen/proposals",
+          icon: FileStack,
           badge: null,
           visible: canSubmitCitizen,
         },

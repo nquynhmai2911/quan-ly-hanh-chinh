@@ -7,8 +7,6 @@
 export const SystemRoles = {
   ADMIN: "ADMIN",
   LEADER: "LEADER",
-  DEPT_HEAD: "DEPT_HEAD",
-  CLERK: "CLERK",
   SPECIALIST: "SPECIALIST",
   CITIZEN: "CITIZEN",
 } as const;

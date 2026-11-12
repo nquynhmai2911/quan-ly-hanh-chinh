@@ -118,8 +118,6 @@ const MODULE_NAMES: Record<string, string> = {
 const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
   ADMIN: { bg: "bg-rose-100", text: "text-rose-600" },
   LEADER: { bg: "bg-purple-100", text: "text-purple-700" },
-  DEPT_HEAD: { bg: "bg-indigo-100", text: "text-indigo-700" },
-  CLERK: { bg: "bg-amber-100", text: "text-amber-700" },
   SPECIALIST: { bg: "bg-blue-100", text: "text-blue-700" },
   CITIZEN: { bg: "bg-emerald-100", text: "text-emerald-700" },
 };
@@ -358,9 +356,9 @@ export default function AdminUsersPage() {
         prev.map((r) =>
           r.id === selectedRoleId
             ? {
-                ...r,
-                permissions: Array.from(selectedRolePermIds).map((pId) => ({ permissionId: pId })),
-              }
+              ...r,
+              permissions: Array.from(selectedRolePermIds).map((pId) => ({ permissionId: pId })),
+            }
             : r
         )
       );
@@ -713,10 +711,6 @@ export default function AdminUsersPage() {
       label = "Chuyên viên";
       icon = <User className="h-3.5 w-3.5 text-blue-600" />;
       style = "bg-blue-50 text-blue-700 border-blue-200";
-    } else if (roleCode === "CLERK") {
-      label = "Văn thư";
-      icon = <FileText className="h-3.5 w-3.5 text-amber-600" />;
-      style = "bg-amber-50 text-amber-700 border-amber-200";
     } else if (roleCode === "CITIZEN") {
       label = "Người dân";
       icon = <Users className="h-3.5 w-3.5 text-teal-600" />;
@@ -1009,11 +1003,10 @@ export default function AdminUsersPage() {
               window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
             }
           }}
-          className={`flex items-center gap-2 pb-2.5 border-b-2 font-semibold transition-colors cursor-pointer ${
-            activeTab === "ACCOUNTS"
+          className={`flex items-center gap-2 pb-2.5 border-b-2 font-semibold transition-colors cursor-pointer ${activeTab === "ACCOUNTS"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
+            }`}
         >
           <User className="h-4 w-4" />
           <span>Phân quyền theo Tài khoản</span>
@@ -1034,11 +1027,10 @@ export default function AdminUsersPage() {
               fetchRoleMatrix();
             }
           }}
-          className={`flex items-center gap-2 pb-2.5 border-b-2 font-semibold transition-colors cursor-pointer ${
-            activeTab === "ROLES"
+          className={`flex items-center gap-2 pb-2.5 border-b-2 font-semibold transition-colors cursor-pointer ${activeTab === "ROLES"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
+            }`}
         >
           <ShieldCheck className="h-4 w-4" />
           <span>Phân quyền theo Vai trò (Role Matrix)</span>
@@ -1078,26 +1070,23 @@ export default function AdminUsersPage() {
                 <button
                   key={r.id}
                   onClick={() => handleSelectRole(r)}
-                  className={`w-full flex flex-col items-start px-3 py-2.5 rounded text-left transition-colors cursor-pointer ${
-                    isSelected
+                  className={`w-full flex flex-col items-start px-3 py-2.5 rounded text-left transition-colors cursor-pointer ${isSelected
                       ? "bg-indigo-600 text-white font-semibold shadow-xs"
                       : "hover:bg-slate-100 text-slate-700"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="text-sm">{r.name}</span>
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                        isSelected ? "bg-indigo-700 text-white" : "bg-slate-100 text-slate-600"
-                      }`}
+                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? "bg-indigo-700 text-white" : "bg-slate-100 text-slate-600"
+                        }`}
                     >
                       {r.code}
                     </span>
                   </div>
                   <span
-                    className={`text-[11px] mt-0.5 ${
-                      isSelected ? "text-indigo-100" : "text-slate-400"
-                    }`}
+                    className={`text-[11px] mt-0.5 ${isSelected ? "text-indigo-100" : "text-slate-400"
+                      }`}
                   >
                     {r.description || `${r.permissions.length} quyền được gán`}
                   </span>
@@ -1161,11 +1150,10 @@ export default function AdminUsersPage() {
                           <div
                             key={p.id}
                             onClick={() => handleToggleRolePerm(p.id)}
-                            className={`flex items-start gap-2.5 p-2.5 rounded border cursor-pointer select-none transition-colors ${
-                              isChecked
+                            className={`flex items-start gap-2.5 p-2.5 rounded border cursor-pointer select-none transition-colors ${isChecked
                                 ? "bg-indigo-50/60 border-indigo-200 text-indigo-950 font-medium"
                                 : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                            }`}
+                              }`}
                           >
                             <div className="mt-0.5 text-indigo-600 shrink-0">
                               {isChecked ? (
@@ -1280,42 +1268,38 @@ export default function AdminUsersPage() {
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                 <button
                   onClick={() => setPermFilter("ALL")}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    permFilter === "ALL"
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${permFilter === "ALL"
                       ? "bg-slate-900 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Tất cả ({userPermDetail?.allPermissions.length || 0})
                 </button>
                 <button
                   onClick={() => setPermFilter("DIRECT")}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    permFilter === "DIRECT"
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${permFilter === "DIRECT"
                       ? "bg-indigo-600 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Cấp riêng ({directPermsMap.size})
                 </button>
                 <button
                   onClick={() => setPermFilter("INHERITED")}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    permFilter === "INHERITED"
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${permFilter === "INHERITED"
                       ? "bg-purple-600 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Từ vai trò ({userPermDetail ? userPermDetail.inheritedPermissionIds.filter((id) => !deniedPermsSet.has(id)).length : 0})
                 </button>
                 {deniedPermsSet.size > 0 && (
                   <button
                     onClick={() => setPermFilter("DENIED")}
-                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                      permFilter === "DENIED"
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${permFilter === "DENIED"
                         ? "bg-rose-600 text-white"
                         : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
-                    }`}
+                      }`}
                   >
                     Đã bỏ quyền ({deniedPermsSet.size})
                   </button>
@@ -1350,15 +1334,14 @@ export default function AdminUsersPage() {
                         return (
                           <div
                             key={p.id}
-                            className={`p-3 rounded border transition-all ${
-                              isDenied
+                            className={`p-3 rounded border transition-all ${isDenied
                                 ? "bg-rose-50/50 border-rose-300"
                                 : isDirect
-                                ? "bg-indigo-50/70 border-indigo-300 shadow-2xs"
-                                : isChecked
-                                ? "bg-slate-50/80 border-slate-200"
-                                : "bg-white border-slate-200 hover:border-slate-300"
-                            }`}
+                                  ? "bg-indigo-50/70 border-indigo-300 shadow-2xs"
+                                  : isChecked
+                                    ? "bg-slate-50/80 border-slate-200"
+                                    : "bg-white border-slate-200 hover:border-slate-300"
+                              }`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div
@@ -1378,9 +1361,8 @@ export default function AdminUsersPage() {
                                 </div>
                                 <div>
                                   <span
-                                    className={`text-xs font-semibold block ${
-                                      isDenied ? "text-rose-900 line-through decoration-rose-300" : "text-slate-900"
-                                    }`}
+                                    className={`text-xs font-semibold block ${isDenied ? "text-rose-900 line-through decoration-rose-300" : "text-slate-900"
+                                      }`}
                                   >
                                     {p.name}
                                   </span>

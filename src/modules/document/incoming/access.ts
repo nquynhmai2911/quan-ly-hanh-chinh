@@ -13,7 +13,7 @@ export const hasRolePermission = (
 export const isCitizen = (ctx: AuthContext) =>
   ctx.roleCodes.includes("CITIZEN") &&
   !ctx.roleCodes.some((r) =>
-    ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+    ["ADMIN", "LEADER", "SPECIALIST"].includes(r),
   );
 
 export function incomingScope(ctx: AuthContext): Prisma.DocumentWhereInput {
@@ -25,7 +25,6 @@ export function incomingScope(ctx: AuthContext): Prisma.DocumentWhereInput {
     };
   if (
     isAdmin(ctx) ||
-    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_VIEW) ||
     (hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_VIEW) &&
       ctx.permissions.get(Permissions.INCOMING_VIEW) === "ALL") ||
     (hasRolePermission(ctx, "LEADER", Permissions.INCOMING_VIEW) &&

@@ -235,7 +235,7 @@ export function DocumentEditDrawer({
               type="text"
               value={signerName}
               onChange={(e) => setSignerName(e.target.value)}
-              placeholder="VD: Nguyễn Văn An"
+              placeholder="VD: Lãnh đạo ký duyệt"
               className={inputStyle}
             />
           </div>

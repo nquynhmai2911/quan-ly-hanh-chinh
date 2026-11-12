@@ -99,8 +99,12 @@ export function canTransition(
 
   if (direction === "OUTGOING" && !ctx.roles.includes("ADMIN")) {
     const actorIsCreator = ctx.document.creatorId === ctx.userId;
-    const actorIsReviewer = ctx.additionalData?.reviewerId === ctx.userId;
-    const actorIsApprover = ctx.additionalData?.approverId === ctx.userId;
+    const actorIsReviewer =
+      ctx.additionalData?.reviewerId === ctx.userId ||
+      ctx.roles.includes("LEADER");
+    const actorIsApprover =
+      ctx.additionalData?.approverId === ctx.userId ||
+      ctx.roles.includes("LEADER");
     if (
       (["SUBMIT_FOR_REVIEW", "RESUBMIT"].includes(action) && !actorIsCreator) ||
       (["REVIEW_APPROVE", "REVIEW_REJECT"].includes(action) &&

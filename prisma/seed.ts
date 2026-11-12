@@ -1,5 +1,5 @@
 // prisma/seed.ts
-// Seed dữ liệu khởi tạo: vai trò, quyền, đơn vị gốc, admin mặc định
+// Seed dữ liệu khởi tạo hệ thống chuẩn hóa: 4 Vai trò (Quản trị viên, Lãnh đạo, Chuyên viên, Người dân)
 // Chạy: npx prisma db seed
 
 import { PrismaClient, DataScope } from "@prisma/client";
@@ -7,38 +7,68 @@ import { createHash } from "crypto";
 
 const prisma = new PrismaClient();
 
-// ── Hash password đơn giản (Phase 2 sẽ dùng bcrypt) ───────────────────────
 function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
 async function main() {
-  console.log("🌱 Seeding database...");
+  console.log("🌱 Khởi tạo Database với 4 vai trò chuẩn hóa...");
 
-  // ── 1. Chức danh ──────────────────────────────────────────────────────────
+  // ── 0. Xóa dữ liệu cũ để tránh xung đột ──────────────────────────────────
+  console.log("🧹 Đang dọn dẹp dữ liệu cũ...");
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE 
+      audit_logs,
+      notifications,
+      document_readers,
+      document_relations,
+      archive_documents,
+      document_approvals,
+      document_signatures,
+      document_files,
+      document_handlers,
+      incoming_workflows,
+      pending_uploads,
+      documents,
+      document_book_counters,
+      document_books,
+      user_permissions,
+      user_position_roles,
+      user_positions,
+      role_permissions,
+      roles,
+      positions,
+      permissions,
+      archives,
+      external_organizations,
+      fields,
+      document_types,
+      units,
+      users
+    CASCADE;
+  `);
+  console.log("  ✅ Đã dọn dẹp sạch toàn bộ dữ liệu cũ");
+
+  // ── 1. Chức danh (Không còn chức danh Văn thư) ───────────────────────────
   const positionsData = [
     { name: "Quản trị hệ thống", level: 0 },
     { name: "Lãnh đạo", level: 1 },
     { name: "Chuyên viên", level: 2 },
-    { name: "Văn thư", level: 3 },
+    { name: "Người dân", level: 3 },
   ];
 
   const positions: Record<string, string> = {};
   for (const p of positionsData) {
-    const pos = await prisma.position.upsert({
-      where: { name: p.name },
-      update: {},
-      create: p,
+    const pos = await prisma.position.create({
+      data: p,
     });
     positions[p.name] = pos.id;
   }
-  console.log(`  ✅ ${positionsData.length} chức danh`);
+  console.log(`  ✅ ${positionsData.length} chức danh chuẩn`);
 
-  // ── 2. Đơn vị ────────────────────────────────────────────────────────────
-  const rootUnit = await prisma.unit.upsert({
-    where: { code: "CQ" },
-    update: {},
-    create: {
+  // ── 2. Đơn vị / Phòng ban ────────────────────────────────────────────────
+  const rootUnit = await prisma.unit.create({
+    data: {
       name: "Cơ quan",
       code: "CQ",
       level: 0,
@@ -56,10 +86,8 @@ async function main() {
 
   const units: Record<string, string> = { CQ: rootUnit.id };
   for (const d of departmentsData) {
-    const unit = await prisma.unit.upsert({
-      where: { code: d.code },
-      update: {},
-      create: {
+    const unit = await prisma.unit.create({
+      data: {
         ...d,
         parentId: rootUnit.id,
         level: 1,
@@ -67,182 +95,93 @@ async function main() {
     });
     units[d.code] = unit.id;
   }
-  console.log(`  ✅ ${departmentsData.length + 1} đơn vị`);
+  console.log(`  ✅ ${departmentsData.length + 1} đơn vị / phòng ban`);
 
-  // ── 3. Vai trò ────────────────────────────────────────────────────────────
+  // ── 3. Vai trò (ĐÚNG 4 ROLES DUY NHẤT) ───────────────────────────────────
   const rolesData = [
     {
       code: "ADMIN",
-      name: "Quản trị hệ thống",
-      description: "Quản trị hệ thống, không truy cập nội dung văn bản",
+      name: "Quản trị viên",
+      description: "Quản trị người dùng, cơ cấu phòng ban, phân quyền vai trò, cấu hình sổ văn bản, xem Audit Log an toàn",
     },
     {
       code: "LEADER",
       name: "Lãnh đạo",
-      description: "Bút phê, duyệt/ký văn bản đi",
-    },
-    {
-      code: "DEPT_HEAD",
-      name: "Trưởng phòng",
-      description: "Duyệt sơ bộ, phân công, xác nhận hoàn thành",
-    },
-    {
-      code: "CLERK",
-      name: "Văn thư",
-      description: "Vào sổ, cấp số, phát hành văn bản",
-    },
-    {
-      code: "CITIZEN",
-      name: "Người dân",
-      description: "Nộp và theo dõi hồ sơ của mình",
+      description: "Cho ý kiến chỉ đạo bút phê văn bản đến, phân công đơn vị, duyệt sơ bộ, phê duyệt và ký duyệt văn bản đi",
     },
     {
       code: "SPECIALIST",
       name: "Chuyên viên",
-      description: "Thụ lý văn bản, soạn dự thảo",
+      description: "Tiếp nhận vào sổ văn bản đến, thụ lý văn bản, báo cáo tiến độ, soạn dự thảo văn bản đi, cấp số và phát hành",
+    },
+    {
+      code: "CITIZEN",
+      name: "Người dân",
+      description: "Nộp hồ sơ / văn bản trực tuyến qua cổng dịch vụ công và theo dõi kết quả giải quyết",
     },
   ];
 
   const roles: Record<string, string> = {};
   for (const r of rolesData) {
-    const role = await prisma.role.upsert({
-      where: { code: r.code },
-      update: {},
-      create: { ...r, isSystem: true },
+    const role = await prisma.role.create({
+      data: { ...r, isSystem: true },
     });
     roles[r.code] = role.id;
   }
-  console.log(`  ✅ ${rolesData.length} vai trò`);
+  console.log(`  ✅ Đúng ${rolesData.length} vai trò hệ thống: ADMIN, LEADER, SPECIALIST, CITIZEN`);
 
   // ── 4. Quyền (Permissions) ────────────────────────────────────────────────
   const permissionsData = [
     // Văn bản đến
-    {
-      code: "doc.incoming.view",
-      name: "Xem văn bản đến",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.create",
-      name: "Tiếp nhận văn bản đến",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.register",
-      name: "Vào sổ văn bản đến",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.forward",
-      name: "Trình văn bản đến",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.annotate",
-      name: "Bút phê văn bản đến",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.assign",
-      name: "Phân công xử lý",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.process",
-      name: "Xử lý văn bản đến",
-      module: "doc.incoming",
-    },
-    {
-      code: "doc.incoming.complete",
-      name: "Xác nhận hoàn thành",
-      module: "doc.incoming",
-    },
+    { code: "doc.incoming.view", name: "Xem văn bản đến", module: "doc.incoming" },
+    { code: "doc.incoming.create", name: "Tiếp nhận văn bản đến", module: "doc.incoming" },
+    { code: "doc.incoming.register", name: "Vào sổ văn bản đến", module: "doc.incoming" },
+    { code: "doc.incoming.forward", name: "Trình văn bản đến", module: "doc.incoming" },
+    { code: "doc.incoming.annotate", name: "Bút phê văn bản đến", module: "doc.incoming" },
+    { code: "doc.incoming.assign", name: "Phân công xử lý", module: "doc.incoming" },
+    { code: "doc.incoming.process", name: "Xử lý văn bản đến", module: "doc.incoming" },
+    { code: "doc.incoming.complete", name: "Xác nhận hoàn thành", module: "doc.incoming" },
+
     // Văn bản đi
-    {
-      code: "doc.outgoing.view",
-      name: "Xem văn bản đi",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.create",
-      name: "Tạo dự thảo văn bản đi",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.review",
-      name: "Duyệt sơ bộ văn bản đi",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.approve",
-      name: "Duyệt/ký văn bản đi",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.sign",
-      name: "Phê duyệt điện tử",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.number",
-      name: "Cấp số văn bản đi",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.issue",
-      name: "Ban hành văn bản đi",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.recall",
-      name: "Thu hồi văn bản",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.replace",
-      name: "Thay thế văn bản",
-      module: "doc.outgoing",
-    },
-    {
-      code: "doc.outgoing.cancel",
-      name: "Hủy văn bản",
-      module: "doc.outgoing",
-    },
+    { code: "doc.outgoing.view", name: "Xem văn bản đi", module: "doc.outgoing" },
+    { code: "doc.outgoing.create", name: "Tạo dự thảo văn bản đi", module: "doc.outgoing" },
+    { code: "doc.outgoing.review", name: "Duyệt sơ bộ văn bản đi", module: "doc.outgoing" },
+    { code: "doc.outgoing.approve", name: "Duyệt/ký văn bản đi", module: "doc.outgoing" },
+    { code: "doc.outgoing.sign", name: "Phê duyệt điện tử", module: "doc.outgoing" },
+    { code: "doc.outgoing.number", name: "Cấp số văn bản đi", module: "doc.outgoing" },
+    { code: "doc.outgoing.issue", name: "Ban hành văn bản đi", module: "doc.outgoing" },
+    { code: "doc.outgoing.recall", name: "Thu hồi văn bản", module: "doc.outgoing" },
+    { code: "doc.outgoing.replace", name: "Thay thế văn bản", module: "doc.outgoing" },
+    { code: "doc.outgoing.cancel", name: "Hủy văn bản", module: "doc.outgoing" },
+
     // Danh mục
     { code: "catalog.view", name: "Xem danh mục", module: "catalog" },
     { code: "catalog.manage", name: "Quản lý danh mục", module: "catalog" },
+
     // Quản trị
     { code: "admin.user.manage", name: "Quản lý người dùng", module: "admin" },
     { code: "admin.role.manage", name: "Quản lý phân quyền", module: "admin" },
     { code: "admin.unit.manage", name: "Quản lý đơn vị", module: "admin" },
     { code: "admin.system", name: "Cấu hình hệ thống", module: "admin" },
+
     // Hồ sơ lưu trữ
     { code: "archive.view", name: "Xem hồ sơ lưu trữ", module: "archive" },
-    {
-      code: "archive.manage",
-      name: "Quản lý hồ sơ lưu trữ",
-      module: "archive",
-    },
+    { code: "archive.manage", name: "Quản lý hồ sơ lưu trữ", module: "archive" },
+
     // Thông báo
-    {
-      code: "notification.view",
-      name: "Xem thông báo",
-      module: "notification",
-    },
+    { code: "notification.view", name: "Xem thông báo", module: "notification" },
   ];
 
   const perms: Record<string, string> = {};
   for (const p of permissionsData) {
-    const perm = await prisma.permission.upsert({
-      where: { code: p.code },
-      update: {},
-      create: p,
+    const perm = await prisma.permission.create({
+      data: p,
     });
     perms[p.code] = perm.id;
   }
-  console.log(`  ✅ ${permissionsData.length} quyền`);
+  console.log(`  ✅ ${permissionsData.length} quyền hệ thống`);
 
-  // ── 5. Gán quyền cho vai trò ──────────────────────────────────────────────
+  // ── 5. Gán quyền cho 4 vai trò ───────────────────────────────────────────
   const rolePermissionMap: Record<string, string[]> = {
     ADMIN: [
       "admin.user.manage",
@@ -254,12 +193,17 @@ async function main() {
       "archive.view",
       "archive.manage",
       "notification.view",
+      "doc.incoming.view",
+      "doc.incoming.create",
+      "doc.outgoing.view",
+      "doc.outgoing.create",
     ],
     LEADER: [
       "doc.incoming.view",
       "doc.incoming.create",
-      "doc.incoming.annotate",
+      "doc.incoming.register",
       "doc.incoming.forward",
+      "doc.incoming.annotate",
       "doc.incoming.assign",
       "doc.incoming.process",
       "doc.incoming.complete",
@@ -268,41 +212,17 @@ async function main() {
       "doc.outgoing.review",
       "doc.outgoing.approve",
       "doc.outgoing.sign",
+      "doc.outgoing.number",
+      "doc.outgoing.issue",
       "doc.outgoing.recall",
       "doc.outgoing.replace",
       "doc.outgoing.cancel",
       "catalog.view",
-      "archive.view",
-      "notification.view",
-    ],
-    DEPT_HEAD: [
-      "doc.incoming.view",
-      "doc.incoming.create",
-      "doc.incoming.assign",
-      "doc.incoming.complete",
-      "doc.incoming.process",
-      "doc.outgoing.view",
-      "doc.outgoing.create",
-      "doc.outgoing.review",
-      "catalog.view",
-      "notification.view",
-    ],
-    CLERK: [
-      "doc.incoming.view",
-      "doc.incoming.create",
-      "doc.incoming.register",
-      "doc.incoming.forward",
-      "doc.incoming.complete",
-      "doc.outgoing.view",
-      "doc.outgoing.create",
-      "doc.outgoing.number",
-      "doc.outgoing.issue",
-      "catalog.view",
+      "catalog.manage",
       "archive.view",
       "archive.manage",
       "notification.view",
     ],
-    CITIZEN: ["notification.view"],
     SPECIALIST: [
       "doc.incoming.view",
       "doc.incoming.create",
@@ -310,27 +230,28 @@ async function main() {
       "doc.incoming.forward",
       "doc.incoming.assign",
       "doc.incoming.process",
+      "doc.incoming.complete",
       "doc.outgoing.view",
       "doc.outgoing.create",
+      "doc.outgoing.review",
+      "doc.outgoing.number",
+      "doc.outgoing.issue",
+      "doc.outgoing.cancel",
       "catalog.view",
-      "notification.view",
       "archive.view",
       "archive.manage",
+      "notification.view",
+    ],
+    CITIZEN: [
+      "notification.view",
     ],
   };
 
   let rpCount = 0;
   for (const [roleCode, permCodes] of Object.entries(rolePermissionMap)) {
     for (const permCode of permCodes) {
-      await prisma.rolePermission.upsert({
-        where: {
-          roleId_permissionId: {
-            roleId: roles[roleCode],
-            permissionId: perms[permCode],
-          },
-        },
-        update: {},
-        create: {
+      await prisma.rolePermission.create({
+        data: {
           roleId: roles[roleCode],
           permissionId: perms[permCode],
         },
@@ -338,7 +259,7 @@ async function main() {
       rpCount++;
     }
   }
-  console.log(`  ✅ ${rpCount} gán quyền cho vai trò`);
+  console.log(`  ✅ ${rpCount} gán quyền cho 4 vai trò`);
 
   // ── 6. Loại văn bản ───────────────────────────────────────────────────────
   const docTypesData = [
@@ -356,10 +277,8 @@ async function main() {
 
   const docTypes: Record<string, string> = {};
   for (const dt of docTypesData) {
-    const docType = await prisma.documentType.upsert({
-      where: { code: dt.code },
-      update: {},
-      create: dt,
+    const docType = await prisma.documentType.create({
+      data: dt,
     });
     docTypes[dt.code] = docType.id;
   }
@@ -375,10 +294,8 @@ async function main() {
   ];
 
   for (const f of fieldsData) {
-    await prisma.field.upsert({
-      where: { code: f.code },
-      update: {},
-      create: f,
+    await prisma.field.create({
+      data: f,
     });
   }
   console.log(`  ✅ ${fieldsData.length} lĩnh vực`);
@@ -393,10 +310,8 @@ async function main() {
   ];
 
   for (const org of externalOrgsData) {
-    await prisma.externalOrganization.upsert({
-      where: { code: org.code },
-      update: {},
-      create: org,
+    await prisma.externalOrganization.create({
+      data: org,
     });
   }
   console.log(`  ✅ ${externalOrgsData.length} cơ quan bên ngoài`);
@@ -424,23 +339,24 @@ async function main() {
       documentTypeId: docTypes["QĐ"],
       numberTemplate: "{number}/{typeCode}-{unitCode}",
     },
+    {
+      name: "Sổ Công văn đi - KHTC",
+      code: "SCV-KHTC",
+      bookType: "OUTGOING" as const,
+      unitId: units["KHTC"],
+      documentTypeId: docTypes["CV"],
+      numberTemplate: "{number}/{typeCode}-{unitCode}",
+    },
   ];
 
+  const currentYear = new Date().getFullYear();
   for (const b of booksData) {
-    const book = await prisma.documentBook.upsert({
-      where: { code: b.code },
-      update: {},
-      create: b,
+    const book = await prisma.documentBook.create({
+      data: b,
     });
 
-    // Tạo bộ đếm cho năm hiện tại
-    const currentYear = new Date().getFullYear();
-    await prisma.documentBookCounter.upsert({
-      where: {
-        bookId_year: { bookId: book.id, year: currentYear },
-      },
-      update: {},
-      create: {
+    await prisma.documentBookCounter.create({
+      data: {
         bookId: book.id,
         year: currentYear,
         lastNumber: 0,
@@ -449,70 +365,80 @@ async function main() {
   }
   console.log(`  ✅ ${booksData.length} sổ văn bản`);
 
-  // ── 10. Tài khoản Admin mặc định ──────────────────────────────────────────
-  const adminUser = await prisma.user.upsert({
-    where: { email: "admin@eoffice.local" },
-    update: {},
-    create: {
+  // ── 10. Danh sách tài khoản người dùng ────────────────────────────────────
+  // Gồm: Quản trị viên, Người dân, nhiều Chuyên viên ngang cấp, nhiều Lãnh đạo phụ trách phòng ban
+  const seedAccounts = [
+    // 10.1 Quản trị viên
+    {
       employeeCode: "ADMIN001",
-      fullName: "Quản trị viên",
+      fullName: "Quản trị viên hệ thống",
       email: "admin@eoffice.local",
-      passwordHash: hashPassword("Admin@123"),
-      isActive: true,
-    },
-  });
-
-  // Gán admin vào đơn vị gốc, chức danh Quản trị hệ thống
-  const adminPosition = await prisma.userPosition.upsert({
-    where: {
-      userId_unitId_positionId_startedAt: {
-        userId: adminUser.id,
-        unitId: rootUnit.id,
-        positionId: positions["Quản trị hệ thống"],
-        startedAt: new Date("2024-01-01"),
-      },
-    },
-    update: {},
-    create: {
-      userId: adminUser.id,
-      unitId: rootUnit.id,
-      positionId: positions["Quản trị hệ thống"],
-      isPrimary: true,
-      startedAt: new Date("2024-01-01"),
-    },
-  });
-
-  // Gán vai trò ADMIN
-  await prisma.userPositionRole.upsert({
-    where: {
-      userPositionId_roleId: {
-        userPositionId: adminPosition.id,
-        roleId: roles["ADMIN"],
-      },
-    },
-    update: {},
-    create: {
-      userPositionId: adminPosition.id,
-      roleId: roles["ADMIN"],
+      password: "Admin@123",
+      positionName: "Quản trị hệ thống",
+      unitCode: "CQ",
+      roleCode: "ADMIN",
       dataScope: DataScope.ALL,
     },
-  });
-
-  // ── 11. Tài khoản demo (để test luồng) ────────────────────────────────────
-  const demoUsers = [
+    // 10.2 Người dân / Doanh nghiệp
     {
       employeeCode: "CD001",
       fullName: "Nguyễn Văn Dân",
       email: "nguoidan@eoffice.local",
-      positionName: "Chuyên viên",
+      password: "Demo@123",
+      positionName: "Người dân",
       unitCode: "CQ",
       roleCode: "CITIZEN",
       dataScope: DataScope.OWN,
     },
+
+    // 10.3 Nhóm Chuyên viên ngang cấp nhau ở các phòng ban
+    {
+      employeeCode: "CV001",
+      fullName: "Phạm Thị Dung",
+      email: "chuyenvien.tchc@eoffice.local",
+      password: "Demo@123",
+      positionName: "Chuyên viên",
+      unitCode: "TCHC",
+      roleCode: "SPECIALIST",
+      dataScope: DataScope.ALL,
+    },
+    {
+      employeeCode: "CV002",
+      fullName: "Trần Đức Long",
+      email: "chuyenvien2.tchc@eoffice.local",
+      password: "Demo@123",
+      positionName: "Chuyên viên",
+      unitCode: "TCHC",
+      roleCode: "SPECIALIST",
+      dataScope: DataScope.ALL,
+    },
+    {
+      employeeCode: "CV003",
+      fullName: "Hoàng Thị Mai",
+      email: "chuyenvien.khtc@eoffice.local",
+      password: "Demo@123",
+      positionName: "Chuyên viên",
+      unitCode: "KHTC",
+      roleCode: "SPECIALIST",
+      dataScope: DataScope.ALL,
+    },
+    {
+      employeeCode: "CV004",
+      fullName: "Vũ Minh Tuấn",
+      email: "chuyenvien.nv1@eoffice.local",
+      password: "Demo@123",
+      positionName: "Chuyên viên",
+      unitCode: "NV1",
+      roleCode: "SPECIALIST",
+      dataScope: DataScope.ALL,
+    },
+
+    // 10.4 Nhóm Lãnh đạo phụ trách các phòng ban khác nhau (Hợp nhất chung vai trò LEADER)
     {
       employeeCode: "GD001",
-      fullName: "Nguyễn Văn An",
+      fullName: "Lãnh đạo Cơ quan",
       email: "giamdoc@eoffice.local",
+      password: "Demo@123",
       positionName: "Lãnh đạo",
       unitCode: "CQ",
       roleCode: "LEADER",
@@ -522,81 +448,66 @@ async function main() {
       employeeCode: "TP001",
       fullName: "Trần Thị Bình",
       email: "truongphong.tchc@eoffice.local",
+      password: "Demo@123",
       positionName: "Lãnh đạo",
       unitCode: "TCHC",
       roleCode: "LEADER",
-      dataScope: DataScope.UNIT_TREE,
-    },
-    {
-      employeeCode: "VT001",
-      fullName: "Lê Văn Cường",
-      email: "vanthu@eoffice.local",
-      positionName: "Văn thư",
-      unitCode: "VP",
-      roleCode: "CLERK",
       dataScope: DataScope.ALL,
     },
     {
-      employeeCode: "CV001",
-      fullName: "Phạm Thị Dung",
-      email: "chuyenvien.tchc@eoffice.local",
-      positionName: "Chuyên viên",
-      unitCode: "TCHC",
-      roleCode: "SPECIALIST",
-      dataScope: DataScope.OWN,
+      employeeCode: "LD002",
+      fullName: "Lê Văn Đức",
+      email: "lanhdao.khtc@eoffice.local",
+      password: "Demo@123",
+      positionName: "Lãnh đạo",
+      unitCode: "KHTC",
+      roleCode: "LEADER",
+      dataScope: DataScope.ALL,
+    },
+    {
+      employeeCode: "LD003",
+      fullName: "Phạm Quốc Hùng",
+      email: "lanhdao.nv1@eoffice.local",
+      password: "Demo@123",
+      positionName: "Lãnh đạo",
+      unitCode: "NV1",
+      roleCode: "LEADER",
+      dataScope: DataScope.ALL,
     },
   ];
 
-  for (const du of demoUsers) {
-    const user = await prisma.user.upsert({
-      where: { email: du.email },
-      update: {},
-      create: {
-        employeeCode: du.employeeCode,
-        fullName: du.fullName,
-        email: du.email,
-        passwordHash: hashPassword("Demo@123"),
+  for (const acc of seedAccounts) {
+    const user = await prisma.user.create({
+      data: {
+        employeeCode: acc.employeeCode,
+        fullName: acc.fullName,
+        email: acc.email,
+        passwordHash: hashPassword(acc.password),
         isActive: true,
       },
     });
 
-    const up = await prisma.userPosition.upsert({
-      where: {
-        userId_unitId_positionId_startedAt: {
-          userId: user.id,
-          unitId: units[du.unitCode],
-          positionId: positions[du.positionName],
-          startedAt: new Date("2024-01-01"),
-        },
-      },
-      update: {},
-      create: {
+    const up = await prisma.userPosition.create({
+      data: {
         userId: user.id,
-        unitId: units[du.unitCode],
-        positionId: positions[du.positionName],
+        unitId: units[acc.unitCode],
+        positionId: positions[acc.positionName],
         isPrimary: true,
         startedAt: new Date("2024-01-01"),
       },
     });
 
-    await prisma.userPositionRole.upsert({
-      where: {
-        userPositionId_roleId: {
-          userPositionId: up.id,
-          roleId: roles[du.roleCode],
-        },
-      },
-      update: {},
-      create: {
+    await prisma.userPositionRole.create({
+      data: {
         userPositionId: up.id,
-        roleId: roles[du.roleCode],
-        dataScope: du.dataScope,
+        roleId: roles[acc.roleCode],
+        dataScope: acc.dataScope,
       },
     });
   }
-  console.log(`  ✅ ${demoUsers.length + 1} tài khoản (admin + demo)`);
 
-  console.log("\n🎉 Seed completed successfully!");
+  console.log(`  ✅ ${seedAccounts.length} tài khoản khởi tạo thành công (Admin, Dân, Chuyên viên ngang cấp, Lãnh đạo các phòng ban)`);
+  console.log("\n🎉 Seed database hoàn tất thành công!");
 }
 
 main()

@@ -32,7 +32,7 @@ const inputStyle =
   "w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
 
 const QUICK_INSTRUCTIONS = [
-  "Giao Đ/c Trưởng phòng chủ trì, chỉ đạo chuyên viên xử lý đúng quy định và báo cáo kết quả trước hạn.",
+  "Giao Lãnh đạo phụ trách đơn vị chỉ đạo chuyên viên xử lý đúng quy định và báo cáo kết quả trước hạn.",
   "Khẩn trương thẩm định hồ sơ, dự thảo văn bản trả lời trình Lãnh đạo cơ quan ký ban hành.",
   "Chuyển phòng ban chuyên môn phối hợp các đơn vị liên quan xác minh thực tế và đề xuất phương án giải quyết.",
 ];
@@ -382,8 +382,8 @@ export function IncomingActionDrawer({
                 <span className="font-semibold text-slate-800 flex items-center gap-1.5 mb-1">
                   <UserCheck className="h-4 w-4 text-indigo-600" />
                   {action.action === "CLERK_DISTRIBUTE"
-                    ? "Trưởng phòng phụ trách đơn vị *"
-                    : "Trưởng phòng nhận chỉ đạo / Người phụ trách *"}
+                    ? "Lãnh đạo phụ trách đơn vị *"
+                    : "Lãnh đạo nhận chỉ đạo / Người phụ trách *"}
                 </span>
                 <select
                   required

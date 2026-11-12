@@ -110,13 +110,20 @@ export async function POST(request: NextRequest) {
           reason: `Nộp hồ sơ trực tuyến: ${onlineCode}`,
         },
       });
-      const clerks = await tx.user.findMany({
+      const receivers = await tx.user.findMany({
         where: {
           isActive: true,
           positions: {
             some: {
               endedAt: null,
-              roles: { some: { role: { code: "CLERK", isActive: true } } },
+              roles: {
+                some: {
+                  role: {
+                    code: { in: ["SPECIALIST", "LEADER", "ADMIN"] },
+                    isActive: true,
+                  },
+                },
+              },
             },
           },
         },
@@ -126,14 +133,14 @@ export async function POST(request: NextRequest) {
         tx,
         ctx,
         doc.id,
-        clerks.map((u) => u.id),
+        receivers.map((u) => u.id),
         "Hồ sơ trực tuyến chờ tiếp nhận",
         `Hồ sơ ${onlineCode}: ${doc.title}`,
       );
       return {
         id: doc.id,
         onlineCode,
-        message: "Hồ sơ và tệp đính kèm đã được lưu, chờ văn thư tiếp nhận.",
+        message: "Hồ sơ và tệp đính kèm đã được lưu, chờ tiếp nhận xử lý.",
       };
     });
     return successResponse(result, 201);

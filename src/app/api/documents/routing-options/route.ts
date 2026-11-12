@@ -8,7 +8,7 @@ export async function GET() {
     const ctx = await requireAuth();
     if (
       !ctx.roleCodes.some((r) =>
-        ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+        ["ADMIN", "LEADER", "SPECIALIST"].includes(r),
       )
     ) {
       throw new BusinessError("FORBIDDEN");
@@ -27,7 +27,7 @@ export async function GET() {
                 some: {
                   role: {
                     isActive: true,
-                    code: { in: ["LEADER", "DEPT_HEAD", "SPECIALIST", "ADMIN"] },
+                    code: { in: ["LEADER", "SPECIALIST", "ADMIN"] },
                   },
                 },
               },

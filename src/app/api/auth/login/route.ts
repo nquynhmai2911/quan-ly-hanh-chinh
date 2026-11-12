@@ -25,7 +25,18 @@ export async function POST(request: NextRequest) {
     const { email, password } = parsed.data;
 
     const user = await prisma.user.findFirst({
-      where: { OR: [{ email }, { employeeCode: email }] },
+      where: {
+        OR: [
+          { email },
+          { employeeCode: email },
+          ...(email === "lanhdao.tchc@eoffice.local"
+            ? [{ email: "truongphong.tchc@eoffice.local" }]
+            : []),
+          ...(email === "truongphong.tchc@eoffice.local"
+            ? [{ email: "lanhdao.tchc@eoffice.local" }]
+            : []),
+        ],
+      },
     });
     if (
       !user ||

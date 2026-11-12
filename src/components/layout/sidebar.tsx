@@ -121,7 +121,7 @@ export function Sidebar({
       items: section.items.filter((item) =>
         citizenOnly
           ? ["/citizen/submit", "/notifications"].includes(item.href)
-          : item.href !== "/citizen/submit" || isAdmin,
+          : item.href !== "/citizen/submit",
       ),
     }))
     .filter((section) => section.items.length);

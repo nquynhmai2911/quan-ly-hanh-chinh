@@ -7,6 +7,7 @@ import { DocumentStatus, DocumentDirection, DataScope } from "@prisma/client";
 export type DocumentAction =
   // ── Hành động Văn bản đến ──
   | "RECEIVE_CITIZEN"
+  | "CLERK_DISTRIBUTE" // Văn thư phân phối trực tiếp về Phòng ban (không qua Lãnh đạo duyệt sơ bộ)
   | "SUBMIT_LEADER" // Văn thư trình Lãnh đạo
   | "LEADER_ANNOTATE" // Lãnh đạo bút phê và giao đơn vị
   | "RETURN_CLERK" // Lãnh đạo trả lại văn thư

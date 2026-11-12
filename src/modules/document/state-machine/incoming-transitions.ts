@@ -5,7 +5,20 @@ import { TransitionRule } from "./types";
 import { Permissions, SystemRoles } from "@/lib/constants";
 
 export const incomingTransitions: TransitionRule[] = [
-  // 1. Văn thư sau khi vào sổ trình Lãnh đạo cho ý kiến
+  // 1a. Văn thư phân phối trực tiếp về phòng ban chuyên môn (không qua bước Lãnh đạo duyệt sơ bộ)
+  {
+    from: "RECEIVED",
+    action: "CLERK_DISTRIBUTE",
+    to: "DISTRIBUTED",
+    allowedRoles: [SystemRoles.CLERK, SystemRoles.ADMIN],
+    requiredPermission: Permissions.INCOMING_FORWARD,
+    labelVi: "Phân phối về Phòng ban",
+    isOptimisticAllowed: true,
+    notifyTargetRole: [SystemRoles.DEPT_HEAD],
+    notifyTitleTemplate: "Văn thư đã phân phối văn bản đến về phòng ban xử lý",
+  },
+
+  // 1b. Văn thư sau khi vào sổ trình Lãnh đạo cho ý kiến (đối với văn bản mật, đặc biệt hoặc xin chủ trương)
   {
     from: "RECEIVED",
     action: "SUBMIT_LEADER",

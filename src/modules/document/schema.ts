@@ -119,6 +119,7 @@ export const transitionDocumentSchema = z.object({
   documentId: z.string().min(1),
   action: z.enum([
     "RECEIVE_CITIZEN",
+    "CLERK_DISTRIBUTE",
     "SUBMIT_LEADER",
     "LEADER_ANNOTATE",
     "RETURN_CLERK",

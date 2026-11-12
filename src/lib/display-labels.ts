@@ -26,6 +26,7 @@ export const processingLabels: Record<string, string> = {
 };
 const actionLabels: Record<string, string> = {
   RECEIVE_CITIZEN: "Tiếp nhận và vào sổ",
+  CLERK_DISTRIBUTE: "Phân phối về Phòng ban",
   CITIZEN_SUBMIT: "Nộp hồ sơ trực tuyến",
   CREATE_INCOMING: "Tiếp nhận văn bản đến",
   CREATE_OUTGOING_DRAFT: "Tạo dự thảo văn bản đi",

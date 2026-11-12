@@ -75,8 +75,10 @@ export function incomingActions(
     hasRolePermission(ctx, "CLERK", Permissions.INCOMING_REGISTER)
   )
     add("RECEIVE_CITIZEN", "RECEIVED");
-  if (doc.status === "RECEIVED" && clerk)
+  if (doc.status === "RECEIVED" && clerk) {
+    add("CLERK_DISTRIBUTE", "DISTRIBUTED");
     add("SUBMIT_LEADER", "PENDING_LEADER");
+  }
   if (doc.status === "PENDING_LEADER" && leader) {
     add("LEADER_ANNOTATE", "DISTRIBUTED", true);
     add("RETURN_CLERK", "RECEIVED", true);
@@ -310,6 +312,62 @@ export async function transitionIncoming(
         data: { registrarId: ctx.userId },
       });
       recipients = [doc.creatorId];
+    } else if (input.action === "CLERK_DISTRIBUTE") {
+      if (!doc.documentNumber || !doc.documentBookId)
+        throw new BusinessError(
+          "VALIDATION_ERROR",
+          "Cần vào sổ văn bản trước khi phân phối.",
+        );
+      if (!input.unitId)
+        throw new BusinessError(
+          "VALIDATION_ERROR",
+          "Vui lòng chọn phòng ban xử lý.",
+        );
+      const head = await requireRecipient(
+        tx,
+        input.headId,
+        "DEPT_HEAD",
+        input.unitId,
+      );
+      // Gán lãnh đạo phê duyệt mặc định nếu chưa gán
+      let leaderId = doc.workflow?.leaderId;
+      if (!leaderId) {
+        const defaultLeader = await tx.user.findFirst({
+          where: {
+            isActive: true,
+            positions: {
+              some: {
+                startedAt: { lte: new Date() },
+                endedAt: null,
+                roles: { some: { role: { code: "LEADER", isActive: true } } },
+              },
+            },
+          },
+        });
+        if (defaultLeader) leaderId = defaultLeader.id;
+      }
+      await tx.incomingWorkflow.upsert({
+        where: { documentId: id },
+        create: {
+          documentId: id,
+          registrarId: ctx.userId,
+          leaderId: leaderId || undefined,
+          headId: head.id,
+          unitId: input.unitId,
+          instruction: reason || "Văn thư phân phối trực tiếp về phòng ban chuyên môn xử lý.",
+        },
+        update: {
+          registrarId: ctx.userId,
+          ...(leaderId ? { leaderId } : {}),
+          headId: head.id,
+          unitId: input.unitId,
+          instruction: reason || "Văn thư phân phối trực tiếp về phòng ban chuyên môn xử lý.",
+        },
+      });
+      data.processingDeadline =
+        input.processingDeadline || doc.processingDeadline;
+      recipients = [head.id];
+      reason = `Văn thư phân phối về phòng ban cho Trưởng phòng ${head.fullName}: ${reason || "Xử lý theo quy chế"}`;
     } else if (input.action === "SUBMIT_LEADER") {
       if (!doc.documentNumber || !doc.documentBookId || !doc.files.length)
         throw new BusinessError(

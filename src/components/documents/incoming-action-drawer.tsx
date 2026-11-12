@@ -52,6 +52,7 @@ export function IncomingActionDrawer({
     "RECEIVE_CITIZEN",
     "SUBMIT_LEADER",
     "LEADER_ANNOTATE",
+    "CLERK_DISTRIBUTE",
   ].includes(action.action);
 
   const [people, setPeople] = useState<Person[]>([]);
@@ -67,9 +68,12 @@ export function IncomingActionDrawer({
   const [bookId, setBookId] = useState("");
   const [deadline, setDeadline] = useState("");
 
-  // Default deadline to 7 days ahead for annotations
+  // Default deadline to 7 days ahead for annotations and clerk distributions
   useEffect(() => {
-    if (action.action === "LEADER_ANNOTATE" && !deadline) {
+    if (
+      ["LEADER_ANNOTATE", "CLERK_DISTRIBUTE"].includes(action.action) &&
+      !deadline
+    ) {
       const d = new Date();
       d.setDate(d.getDate() + 7);
       setDeadline(d.toISOString().slice(0, 10));
@@ -111,8 +115,11 @@ export function IncomingActionDrawer({
           }
         }
 
-        // Pre-select unit and department head for LEADER_ANNOTATE
-        if (action.action === "LEADER_ANNOTATE") {
+        // Pre-select unit and department head for LEADER_ANNOTATE or CLERK_DISTRIBUTE
+        if (
+          action.action === "LEADER_ANNOTATE" ||
+          action.action === "CLERK_DISTRIBUTE"
+        ) {
           const functionalUnits = uList.filter(
             (u) => (u.level ?? 1) > 0 || uList.length === 1,
           );
@@ -333,7 +340,7 @@ export function IncomingActionDrawer({
             </label>
           )}
 
-          {action.action === "LEADER_ANNOTATE" && (
+          {["LEADER_ANNOTATE", "CLERK_DISTRIBUTE"].includes(action.action) && (
             <div className="space-y-3.5 bg-slate-50/70 p-3.5 rounded-lg border border-slate-200">
               <label className="block text-sm">
                 <span className="font-semibold text-slate-800 flex items-center gap-1.5 mb-1">
@@ -358,7 +365,9 @@ export function IncomingActionDrawer({
               <label className="block text-sm">
                 <span className="font-semibold text-slate-800 flex items-center gap-1.5 mb-1">
                   <UserCheck className="h-4 w-4 text-indigo-600" />
-                  Trưởng phòng nhận chỉ đạo / Người phụ trách *
+                  {action.action === "CLERK_DISTRIBUTE"
+                    ? "Trưởng phòng phụ trách đơn vị *"
+                    : "Trưởng phòng nhận chỉ đạo / Người phụ trách *"}
                 </span>
                 <select
                   required
@@ -394,24 +403,33 @@ export function IncomingActionDrawer({
             <label className="block text-sm font-semibold text-slate-800">
               {action.action === "LEADER_ANNOTATE"
                 ? "Ý kiến chỉ đạo / Bút phê của Lãnh đạo *"
-                : "Ý kiến / Lý do giải quyết"}
+                : action.action === "CLERK_DISTRIBUTE"
+                  ? "Ý kiến phân phối / Nội dung chuyển giao"
+                  : "Ý kiến / Lý do giải quyết"}
               {action.requiresReason ? " *" : ""}
             </label>
 
-            {action.action === "LEADER_ANNOTATE" && (
+            {["LEADER_ANNOTATE", "CLERK_DISTRIBUTE"].includes(action.action) && (
               <div className="space-y-1">
                 <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-amber-500" /> Gợi ý bút phê nhanh:
+                  <Sparkles className="h-3 w-3 text-amber-500" /> Gợi ý nội dung nhanh:
                 </span>
                 <div className="flex flex-col gap-1.5">
-                  {QUICK_INSTRUCTIONS.map((hint, idx) => (
+                  {(action.action === "CLERK_DISTRIBUTE"
+                    ? [
+                        "Kính chuyển phòng ban chuyên môn chủ trì giải quyết đúng hạn.",
+                        "Chuyển đơn vị phối hợp xác minh và tham mưu xử lý.",
+                        "Đề nghị đơn vị nghiên cứu xử lý theo chức năng nhiệm vụ.",
+                      ]
+                    : QUICK_INSTRUCTIONS
+                  ).map((hint, idx) => (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => setReason(hint)}
                       className="text-left text-xs bg-white hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 text-slate-700 border border-slate-200 rounded px-2.5 py-1.5 transition-colors cursor-pointer"
                     >
-                      ✍️ {hint}
+                      {hint}
                     </button>
                   ))}
                 </div>
@@ -425,7 +443,9 @@ export function IncomingActionDrawer({
               placeholder={
                 action.action === "LEADER_ANNOTATE"
                   ? "Nhập ý kiến chỉ đạo, yêu cầu chuyên môn hoặc chọn gợi ý bên trên…"
-                  : "Nhập nội dung ý kiến hoặc lý do thực hiện thao tác…"
+                  : action.action === "CLERK_DISTRIBUTE"
+                    ? "Nhập ý kiến phân phối hoặc chọn gợi ý bên trên…"
+                    : "Nhập nội dung ý kiến hoặc lý do thực hiện thao tác…"
               }
               className={inputStyle}
               value={reason}

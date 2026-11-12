@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
         destination: "/dashboard?tab=reports",
         permanent: false,
       },
+      {
+        source: "/admin/roles",
+        destination: "/admin/users?tab=roles",
+        permanent: false,
+      },
     ];
   },
 };

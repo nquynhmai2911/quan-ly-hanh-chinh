@@ -30,7 +30,10 @@ import {
   CornerDownLeft,
   Printer,
   ExternalLink,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import { DocumentEditDrawer } from "@/components/documents/document-edit-drawer";
 import { IncomingActionDrawer } from "@/components/documents/incoming-action-drawer";
 import { AssignmentDrawer } from "@/components/documents/assignment-drawer";
 import {
@@ -148,6 +151,35 @@ export default function DocumentDetailPage({
   // Drawer báo cáo kết quả
   const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
   const [reportContent, setReportContent] = useState("");
+
+  // Chỉnh sửa & Xóa văn bản
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function handleDeleteDocument() {
+    if (!docData) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetch(`/api/documents/${docData.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success)
+        throw new Error(json.error?.message || "Không thể xóa văn bản.");
+      toast.success("Đã xóa văn bản thành công.");
+      setIsDeleteDialogOpen(false);
+      if (docData.direction === "OUTGOING") {
+        router.push("/documents/outgoing");
+      } else {
+        router.push("/documents/incoming");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi khi xóa văn bản.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   async function fetchDocumentDetail() {
     try {
@@ -357,6 +389,28 @@ export default function DocumentDetailPage({
 
         {/* Dynamic Action Buttons (Sinh từ State Machine) */}
         <div className="flex items-center gap-2">
+          {/* Nút Chỉnh sửa thông tin */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditDrawerOpen(true)}
+            className="text-xs text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1" />
+            Chỉnh sửa
+          </Button>
+
+          {/* Nút Xóa văn bản */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            className="text-xs text-rose-600 hover:bg-rose-50 border-rose-200"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Xóa
+          </Button>
+
           {/* Nút nộp báo cáo nếu là chuyên viên thụ lý */}
           {canReport && (
             <Button
@@ -1216,6 +1270,44 @@ export default function DocumentDetailPage({
           </div>
         </form>
       </Drawer>
+
+      {/* Dialog xác nhận xóa văn bản */}
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteDocument}
+        isLoading={isDeleting}
+        title={`Xác nhận xóa văn bản ${docData?.direction === "OUTGOING" ? "đi / dự thảo" : "đến"}`}
+        description={`Bạn có chắc chắn muốn xóa văn bản "${docData?.title}" khỏi hệ thống? Toàn bộ quy trình luân chuyển, phê duyệt, nhật ký và các tệp đính kèm sẽ bị xóa hoàn toàn.`}
+        confirmText="Xóa vĩnh viễn"
+        variant="danger"
+      />
+
+      {/* Drawer chỉnh sửa thông tin văn bản */}
+      <DocumentEditDrawer
+        isOpen={isEditDrawerOpen}
+        onClose={() => setIsEditDrawerOpen(false)}
+        document={
+          docData
+            ? {
+                id: docData.id,
+                direction: docData.direction,
+                title: docData.title,
+                documentNumber: docData.documentNumber,
+                originalCode: docData.originalCode,
+                senderName: docData.senderOrg?.name || docData.senderName,
+                recipientsSummary: docData.recipientsSummary,
+                signerName: docData.signerName,
+                urgency: docData.urgency,
+                security: docData.security,
+                issuedDate: docData.issuedDate,
+                processingDeadline: docData.processingDeadline,
+                summaryNotes: docData.summaryNotes,
+              }
+            : null
+        }
+        onSaved={fetchDocumentDetail}
+      />
     </div>
   );
 }

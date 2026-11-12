@@ -101,9 +101,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const ctx = await requirePermission(Permissions.INCOMING_CREATE);
-    if (!hasRolePermission(ctx, "CLERK", Permissions.INCOMING_CREATE))
-      throw new BusinessError("FORBIDDEN");
+    const ctx = await requireAuth();
+    const isStaff = ctx.roleCodes.some((r) =>
+      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+    );
+    if (!isStaff)
+      throw new BusinessError(
+        "FORBIDDEN",
+        "Bạn không có quyền tiếp nhận văn bản đến.",
+      );
     const body = await request.json();
     const parsed = incomingDocumentSubmissionSchema.safeParse({
       ...body,

@@ -15,7 +15,9 @@ import {
   SecurityBadge,
 } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
-import { FileText, Plus, UserCheck, Eye, Clock } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DocumentEditDrawer, EditableDocument } from "@/components/documents/document-edit-drawer";
+import { FileText, Plus, UserCheck, Eye, Clock, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
 import { DocumentStatus } from "@prisma/client";
@@ -65,16 +67,42 @@ export default function IncomingDocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [canCreate, setCanCreate] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<EditableDocument | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<IncomingItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((j) => {
         if (j.success)
           setCanCreate(
-            j.data.roles.some((r: string) => ["ADMIN", "CLERK"].includes(r)),
+            j.data.roles.some((r: string) =>
+              ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+            ),
           );
       });
   }, []);
+
+  async function handleDeleteDocument() {
+    if (!deletingDoc) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetch(`/api/documents/${deletingDoc.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success)
+        throw new Error(json.error?.message || "Không thể xóa văn bản.");
+      toast.success("Đã xóa văn bản thành công.");
+      setDeletingDoc(null);
+      fetchIncomingDocs();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi khi xóa văn bản.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   async function fetchIncomingDocs() {
     try {
@@ -194,17 +222,52 @@ export default function IncomingDocumentsPage() {
       header: () => <span className="whitespace-nowrap text-right block pr-2">Thao tác</span>,
       cell: ({ row }) => (
         <div
-          className="flex items-center justify-end gap-1.5 whitespace-nowrap pr-2"
+          className="flex items-center justify-end gap-1 whitespace-nowrap pr-2"
           onClick={(e) => e.stopPropagation()}
         >
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs whitespace-nowrap shrink-0 px-2.5"
+            className="h-7 text-xs whitespace-nowrap shrink-0 px-2"
             onClick={() => router.push(`/documents/${row.original.id}`)}
+            title="Xem chi tiết"
           >
-            <Eye className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
+            <Eye className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
             Chi tiết
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs whitespace-nowrap shrink-0 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+            onClick={() =>
+              setEditingDoc({
+                id: row.original.id,
+                direction: "INCOMING",
+                title: row.original.title,
+                documentNumber: row.original.documentNumber,
+                originalCode: row.original.originalCode,
+                senderName:
+                  row.original.senderOrg?.name || row.original.senderName,
+                urgency: row.original.urgency,
+                security: row.original.security as any,
+                issuedDate: row.original.issuedDate,
+                processingDeadline: row.original.processingDeadline,
+              })
+            }
+            title="Chỉnh sửa thông tin"
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1 shrink-0" />
+            Sửa
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs whitespace-nowrap shrink-0 px-2 text-rose-600 hover:bg-rose-50 border-rose-200"
+            onClick={() => setDeletingDoc(row.original)}
+            title="Xóa văn bản"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1 shrink-0" />
+            Xóa
           </Button>
         </div>
       ),
@@ -270,6 +333,26 @@ export default function IncomingDocumentsPage() {
         onSearchChange={setSearch}
         onRowClick={(row) => router.push(`/documents/${row.id}`)}
         searchPlaceholder="Tìm theo số đến, ký hiệu gốc, trích yếu, nơi gửi..."
+      />
+
+      {/* Dialog xác nhận xóa */}
+      <ConfirmDialog
+        isOpen={!!deletingDoc}
+        onClose={() => setDeletingDoc(null)}
+        onConfirm={handleDeleteDocument}
+        isLoading={isDeleting}
+        title="Xác nhận xóa văn bản đến"
+        description={`Bạn có chắc chắn muốn xóa văn bản "${deletingDoc?.title}" (Số: ${deletingDoc?.documentNumber || deletingDoc?.originalCode || "Chưa cấp"}) khỏi hệ thống? Dữ liệu và các tệp đính kèm sẽ bị xóa hoàn toàn.`}
+        confirmText="Xóa vĩnh viễn"
+        variant="danger"
+      />
+
+      {/* Drawer chỉnh sửa thông tin */}
+      <DocumentEditDrawer
+        isOpen={!!editingDoc}
+        onClose={() => setEditingDoc(null)}
+        document={editingDoc}
+        onSaved={fetchIncomingDocs}
       />
     </div>
   );

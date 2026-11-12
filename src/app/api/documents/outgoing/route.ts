@@ -4,7 +4,7 @@
 import { claimUpload } from "@/lib/storage/claim-upload";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission, buildDataScopeFilter } from "@/lib/auth/guard";
+import { requirePermission, requireAuth, buildDataScopeFilter } from "@/lib/auth/guard";
 import { Permissions } from "@/lib/constants";
 import {
   successResponse,
@@ -101,7 +101,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const ctx = await requirePermission(Permissions.OUTGOING_CREATE);
+    const ctx = await requireAuth();
+    const isStaff = ctx.roleCodes.some((r) =>
+      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+    );
+    if (!isStaff)
+      throw new BusinessError(
+        "FORBIDDEN",
+        "Bạn không có quyền soạn thảo văn bản đi.",
+      );
 
     const body = await request.json();
     const parsed = createOutgoingDraftSchema.safeParse(body);
@@ -129,7 +137,7 @@ export async function POST(request: NextRequest) {
     } = parsed.data;
 
     if (
-      !ctx.roleCodes.includes("ADMIN") &&
+      !ctx.roleCodes.some((r) => ["ADMIN", "LEADER", "CLERK"].includes(r)) &&
       !ctx.positions.some((p) => p.unitId === draftUnitId)
     )
       throw new BusinessError(
@@ -193,15 +201,36 @@ export async function POST(request: NextRequest) {
       });
 
       // Tạo chuỗi duyệt nối tiếp mặc định
-      const deptHead = await tx.userPositionRole.findFirst({
-        where: {
-          role: { code: { in: ["DEPT_HEAD", "LEADER"] } },
-          userPosition: { unitId: draftUnitId, endedAt: null },
-        },
-        select: { userPosition: { select: { userId: true } } },
-      });
+      const deptHead =
+        (await tx.userPositionRole.findFirst({
+          where: {
+            role: { code: { in: ["DEPT_HEAD", "LEADER"] } },
+            userPosition: { unitId: draftUnitId, endedAt: null },
+          },
+          select: { userPosition: { select: { userId: true } } },
+        })) ||
+        (await tx.userPositionRole.findFirst({
+          where: {
+            role: { code: { in: ["DEPT_HEAD", "LEADER"] } },
+            userPosition: { endedAt: null },
+          },
+          select: { userPosition: { select: { userId: true } } },
+        }));
 
       const leader =
+        (await tx.userPositionRole.findFirst({
+          where: {
+            role: { code: "LEADER" },
+            userPosition: {
+              endedAt: null,
+              unit: { level: 0 },
+              ...(deptHead?.userPosition.userId
+                ? { userId: { not: deptHead.userPosition.userId } }
+                : {}),
+            },
+          },
+          select: { userPosition: { select: { userId: true } } },
+        })) ||
         (await tx.userPositionRole.findFirst({
           where: {
             role: { code: "LEADER" },

@@ -63,6 +63,34 @@ export default function OutgoingDocumentsPage() {
   const [deletingDoc, setDeletingDoc] = useState<OutgoingItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [canView, setCanView] = useState<boolean | null>(null);
+  const [canCreate, setCanCreate] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          const roles = j.data.roles || [];
+          const permissions = j.data.permissions || {};
+          const isAdmin = roles.includes("ADMIN");
+          const hasView =
+            isAdmin ||
+            Boolean(permissions["doc.outgoing.view"]) ||
+            Boolean(permissions["doc.outgoing.create"]);
+          setCanView(hasView);
+
+          const hasCreate =
+            isAdmin ||
+            Boolean(permissions["doc.outgoing.create"]);
+          setCanCreate(hasCreate);
+        } else {
+          setCanView(false);
+        }
+      })
+      .catch(() => setCanView(false));
+  }, []);
+
   async function handleDeleteDocument() {
     if (!deletingDoc) return;
     try {
@@ -248,6 +276,23 @@ export default function OutgoingDocumentsPage() {
     },
   ];
 
+  if (canView === false) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm max-w-lg mx-auto my-12">
+        <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <Send className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">Không có quyền truy cập</h2>
+        <p className="text-sm text-slate-500 mt-2 mb-6">
+          Tài khoản của bạn hiện không có quyền xem hoặc soạn thảo văn bản đi. Vui lòng liên hệ Quản trị viên nếu cần cấp lại quyền.
+        </p>
+        <Link href="/dashboard">
+          <Button variant="outline">Quay lại Bàn làm việc</Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -257,12 +302,14 @@ export default function OutgoingDocumentsPage() {
             Quản lý quy trình soạn thảo dự thảo, phê duyệt nối tiếp, cấp số và ban hành văn bản
           </p>
         </div>
-        <Link href="/documents/outgoing/new">
-          <Button className="gap-1.5 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Tạo dự thảo văn bản đi mới
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/documents/outgoing/new">
+            <Button className="gap-1.5 shadow-sm">
+              <Plus className="h-4 w-4" />
+              Tạo dự thảo văn bản đi mới
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Status Filter Tabs */}

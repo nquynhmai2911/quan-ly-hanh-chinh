@@ -35,12 +35,14 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   userRoles?: string[];
+  userPermissions?: string[];
 }
 
 export function Sidebar({
   isCollapsed,
   onToggle,
   userRoles = [],
+  userPermissions = [],
 }: SidebarProps) {
   const pathname = usePathname();
   const [adminOpen, setAdminOpen] = useState(true);
@@ -52,6 +54,19 @@ export function Sidebar({
     !userRoles.some((r) =>
       ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
     );
+
+  const permSet = new Set(userPermissions);
+  const hasPerm = (code: string) => isAdmin || permSet.has(code);
+
+  // Quyền truy cập các mục chức năng dựa trên quyền cụ thể của tài khoản
+  const canViewIncoming = isAdmin || citizenOnly || hasPerm("doc.incoming.view") || hasPerm("doc.incoming.create");
+  const canViewOutgoing = !citizenOnly && (isAdmin || hasPerm("doc.outgoing.view") || hasPerm("doc.outgoing.create"));
+  const canSubmitCitizen = citizenOnly || isAdmin;
+  const canSearch = !citizenOnly && (isAdmin || hasPerm("doc.incoming.view") || hasPerm("doc.outgoing.view") || hasPerm("archive.view"));
+  const canViewArchives = !citizenOnly && (isAdmin || hasPerm("archive.view") || hasPerm("archive.manage"));
+  const canViewBooks = !citizenOnly && (isAdmin || hasPerm("catalog.view") || hasPerm("catalog.manage"));
+  const canViewNotifications = true;
+
   const navSections = [
     {
       title: "ĐIỀU HÀNH",
@@ -61,6 +76,7 @@ export function Sidebar({
           href: "/dashboard",
           icon: LayoutDashboard,
           badge: null,
+          visible: true,
         },
       ],
     },
@@ -72,24 +88,28 @@ export function Sidebar({
           href: "/documents/incoming",
           icon: FileText,
           badge: null,
+          visible: canViewIncoming,
         },
         {
           name: "Văn bản đi / Dự thảo",
           href: "/documents/outgoing",
           icon: Send,
           badge: null,
+          visible: canViewOutgoing,
         },
         {
           name: "Nộp văn bản đến (Dịch vụ công)",
           href: "/citizen/submit",
           icon: UploadCloud,
           badge: null,
+          visible: canSubmitCitizen,
         },
         {
           name: "Tra cứu văn bản",
           href: "/search",
           icon: Search,
           badge: null,
+          visible: canSearch,
         },
       ],
     },
@@ -100,16 +120,22 @@ export function Sidebar({
           name: "Hồ sơ công việc",
           href: "/archives",
           icon: Archive,
+          badge: null,
+          visible: canViewArchives,
         },
         {
           name: "Sổ văn bản",
           href: "/catalogs/books",
           icon: BookOpen,
+          badge: null,
+          visible: canViewBooks,
         },
         {
           name: "Trung tâm thông báo",
           href: "/notifications",
           icon: Bell,
+          badge: null,
+          visible: canViewNotifications,
         },
       ],
     },
@@ -118,25 +144,18 @@ export function Sidebar({
   const visibleSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) =>
-        citizenOnly
-          ? [
-              "/documents/incoming",
-              "/citizen/submit",
-              "/notifications",
-            ].includes(item.href)
-          : item.href !== "/citizen/submit",
-      ),
+      items: section.items.filter((item) => item.visible),
     }))
-    .filter((section) => section.items.length);
+    .filter((section) => section.items.length > 0);
+
   const adminItems = [
-    { name: "Phân quyền người dùng", href: "/admin/users", icon: ShieldCheck },
-    { name: "Cây Đơn vị / Phòng ban", href: "/admin/units", icon: Building2 },
-    { name: "Chức danh", href: "/admin/positions", icon: Briefcase },
-    { name: "Loại hồ sơ & Độ khẩn", href: "/admin/document-types", icon: FileStack },
-    { name: "Cấu hình Sổ văn bản", href: "/admin/books", icon: BookOpen },
-    { name: "Nhật ký hệ thống", href: "/admin/audit-logs", icon: History },
-  ];
+    { name: "Phân quyền người dùng", href: "/admin/users", icon: ShieldCheck, visible: isAdmin || hasPerm("admin.role.manage") },
+    { name: "Cây Đơn vị / Phòng ban", href: "/admin/units", icon: Building2, visible: isAdmin || hasPerm("admin.unit.manage") },
+    { name: "Chức danh", href: "/admin/positions", icon: Briefcase, visible: isAdmin || hasPerm("admin.system") || hasPerm("admin.unit.manage") },
+    { name: "Loại hồ sơ & Độ khẩn", href: "/admin/document-types", icon: FileStack, visible: isAdmin || hasPerm("admin.system") },
+    { name: "Cấu hình Sổ văn bản", href: "/admin/books", icon: BookOpen, visible: isAdmin || hasPerm("admin.system") },
+    { name: "Nhật ký hệ thống", href: "/admin/audit-logs", icon: History, visible: isAdmin || hasPerm("admin.system") },
+  ].filter((item) => item.visible);
 
   return (
     <aside
@@ -234,8 +253,8 @@ export function Sidebar({
           </div>
         ))}
 
-        {/* Quản trị hệ thống (Chỉ hiển thị với Admin hoặc khi chưa phân quyền triệt để) */}
-        {isAdmin && (
+        {/* Quản trị hệ thống (Chỉ hiển thị khi có quyền quản trị) */}
+        {adminItems.length > 0 && (
           <div className="space-y-1 pt-2 border-t border-slate-800/80">
             {!isCollapsed ? (
               <button

@@ -74,23 +74,30 @@ export function incomingActions(
 
   const isLeader =
     isAdmin(ctx) ||
-    ctx.roleCodes.includes("LEADER") ||
-    hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ANNOTATE) ||
-    hasRolePermission(ctx, "LEADER", Permissions.INCOMING_COMPLETE);
+    (ctx.roleCodes.includes("LEADER") &&
+      (ctx.permissions.has(Permissions.INCOMING_ANNOTATE) ||
+        ctx.permissions.has(Permissions.INCOMING_COMPLETE)));
 
-  const isSpecialist =
+  const canApprove =
     isAdmin(ctx) ||
-    ctx.roleCodes.includes("SPECIALIST") ||
-    ctx.roleCodes.includes("CLERK") ||
-    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS) ||
-    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_FORWARD) ||
-    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_FORWARD);
+    (ctx.roleCodes.includes("LEADER") &&
+      ctx.permissions.has(Permissions.INCOMING_COMPLETE));
 
-  if (doc.status === "SUBMITTED" && isSpecialist) {
+  const canRegister =
+    isAdmin(ctx) ||
+    ctx.permissions.has(Permissions.INCOMING_REGISTER) ||
+    ctx.permissions.has(Permissions.INCOMING_CREATE);
+
+  const canProcess =
+    isAdmin(ctx) ||
+    ctx.permissions.has(Permissions.INCOMING_PROCESS) ||
+    ctx.permissions.has(Permissions.INCOMING_FORWARD);
+
+  if (doc.status === "SUBMITTED" && canRegister) {
     add("RECEIVE_CITIZEN", "RECEIVED");
   }
 
-  if (doc.status === "RECEIVED" && isSpecialist) {
+  if (doc.status === "RECEIVED" && canProcess) {
     add("CLERK_DISTRIBUTE", "PROCESSING");
     add("SUBMIT_REVIEW", "PENDING_REVIEW");
     add("SUBMIT_LEADER", "PENDING_LEADER");
@@ -128,7 +135,7 @@ export function incomingActions(
 
   if (
     doc.status === "PENDING_REVIEW" &&
-    (head || isLeader)
+    (head || canApprove)
   ) {
     add("APPROVE_COMPLETE", "COMPLETED");
     add("REJECT_REPORT", "PROCESSING", true);

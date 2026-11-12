@@ -27,10 +27,13 @@ export default async function DashboardLayout({
     redirect("/login?reauth=1");
   }
 
+  const permissionsList = Array.from(authContext.permissions.keys());
+
   return (
     <DashboardShell
       user={user}
       roles={authContext?.roleCodes || []}
+      permissions={permissionsList}
       primaryPositionName={
         authContext.roleCodes.includes("CITIZEN")
           ? "Người dân"

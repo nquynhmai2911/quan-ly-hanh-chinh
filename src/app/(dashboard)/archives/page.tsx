@@ -4,6 +4,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,33 @@ export default function ArchivesPage() {
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [canView, setCanView] = useState<boolean | null>(null);
+  const [canManage, setCanManage] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          const roles = j.data.roles || [];
+          const permissions = j.data.permissions || {};
+          const isAdmin = roles.includes("ADMIN");
+          const hasView =
+            isAdmin ||
+            Boolean(permissions["archive.view"]) ||
+            Boolean(permissions["archive.manage"]);
+          setCanView(hasView);
+
+          const hasMgmt =
+            isAdmin ||
+            Boolean(permissions["archive.manage"]);
+          setCanManage(hasMgmt);
+        } else {
+          setCanView(false);
+        }
+      })
+      .catch(() => setCanView(false));
+  }, []);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -153,6 +181,23 @@ export default function ArchivesPage() {
     },
   ];
 
+  if (canView === false) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm max-w-lg mx-auto my-12">
+        <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <Archive className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">Không có quyền truy cập</h2>
+        <p className="text-sm text-slate-500 mt-2 mb-6">
+          Tài khoản của bạn hiện không có quyền truy cập hồ sơ lưu trữ công việc. Vui lòng liên hệ Quản trị viên nếu cần cấp lại quyền.
+        </p>
+        <Link href="/dashboard">
+          <Button variant="outline">Quay lại Bàn làm việc</Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -162,10 +207,12 @@ export default function ArchivesPage() {
             Tập hợp văn bản vào hồ sơ công việc, thiết lập thời hạn bảo quản và đóng lưu trữ
           </p>
         </div>
-        <Button onClick={() => setIsAddOpen(true)} className="gap-1.5 shadow-sm">
-          <Plus className="h-4 w-4" />
-          Lập hồ sơ mới
-        </Button>
+        {canManage && (
+          <Button onClick={() => setIsAddOpen(true)} className="gap-1.5 shadow-sm">
+            <Plus className="h-4 w-4" />
+            Lập hồ sơ mới
+          </Button>
+        )}
       </div>
 
       <DataTable

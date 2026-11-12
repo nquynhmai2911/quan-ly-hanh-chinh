@@ -13,6 +13,7 @@ import { SessionUser } from "@/types/auth";
 interface DashboardShellProps {
   user: SessionUser | null;
   roles?: string[];
+  permissions?: string[];
   primaryPositionName?: string;
   primaryUnitName?: string;
   children: React.ReactNode;
@@ -21,6 +22,7 @@ interface DashboardShellProps {
 export function DashboardShell({
   user,
   roles = [],
+  permissions = [],
   primaryPositionName,
   primaryUnitName,
   children,
@@ -47,6 +49,7 @@ export function DashboardShell({
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
         userRoles={roles}
+        userPermissions={permissions}
       />
 
       {/* Main Content Area */}

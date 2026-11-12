@@ -4,7 +4,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { BookOpen, Search, Hash, Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -22,9 +24,28 @@ interface BookData {
 export default function BooksDirectoryPage() {
   const [books, setBooks] = useState<BookData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [canView, setCanView] = useState<boolean | null>(null);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          const roles = j.data.roles || [];
+          const permissions = j.data.permissions || {};
+          const isAdmin = roles.includes("ADMIN");
+          const hasView =
+            isAdmin ||
+            Boolean(permissions["catalog.view"]) ||
+            Boolean(permissions["catalog.manage"]);
+          setCanView(hasView);
+        } else {
+          setCanView(false);
+        }
+      })
+      .catch(() => setCanView(false));
+
     fetch("/api/admin/books")
       .then((r) => r.json())
       .then((j) => {
@@ -39,6 +60,23 @@ export default function BooksDirectoryPage() {
       b.name.toLowerCase().includes(search.toLowerCase()) ||
       b.code.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (canView === false) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm max-w-lg mx-auto my-12">
+        <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <BookOpen className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">Không có quyền truy cập</h2>
+        <p className="text-sm text-slate-500 mt-2 mb-6">
+          Tài khoản của bạn hiện không có quyền xem sổ văn bản. Vui lòng liên hệ Quản trị viên nếu cần cấp lại quyền.
+        </p>
+        <Link href="/dashboard">
+          <Button variant="outline">Quay lại Bàn làm việc</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

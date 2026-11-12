@@ -102,10 +102,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const ctx = await requireAuth();
-    const isStaff = ctx.roleCodes.some((r) =>
-      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
-    );
-    if (!isStaff)
+    const canCreate =
+      ctx.roleCodes.includes("ADMIN") ||
+      ctx.permissions.has(Permissions.OUTGOING_CREATE);
+    if (!canCreate)
       throw new BusinessError(
         "FORBIDDEN",
         "Bạn không có quyền soạn thảo văn bản đi.",

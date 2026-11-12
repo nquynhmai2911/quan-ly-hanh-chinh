@@ -66,6 +66,7 @@ export default function IncomingDocumentsPage() {
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | "">("");
   const [isLoading, setIsLoading] = useState(true);
 
+  const [canView, setCanView] = useState<boolean | null>(null);
   const [canCreate, setCanCreate] = useState(false);
   const [isCitizen, setIsCitizen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<EditableDocument | null>(null);
@@ -77,9 +78,12 @@ export default function IncomingDocumentsPage() {
       .then((r) => r.json())
       .then((j) => {
         if (j.success) {
+          const roles = j.data.roles || [];
+          const permissions = j.data.permissions || {};
+          const isAdmin = roles.includes("ADMIN");
           const citizen =
-            j.data.roles?.includes("CITIZEN") &&
-            !j.data.roles.some((r: string) =>
+            roles.includes("CITIZEN") &&
+            !roles.some((r: string) =>
               [
                 "ADMIN",
                 "CLERK",
@@ -89,19 +93,24 @@ export default function IncomingDocumentsPage() {
               ].includes(r),
             );
           setIsCitizen(citizen);
-          setCanCreate(
-            j.data.roles.some((r: string) =>
-              [
-                "ADMIN",
-                "CLERK",
-                "LEADER",
-                "DEPT_HEAD",
-                "SPECIALIST",
-              ].includes(r),
-            ),
-          );
+
+          const hasViewPerm =
+            isAdmin ||
+            citizen ||
+            Boolean(permissions["doc.incoming.view"]) ||
+            Boolean(permissions["doc.incoming.create"]);
+          setCanView(hasViewPerm);
+
+          const hasCreatePerm =
+            isAdmin ||
+            Boolean(permissions["doc.incoming.create"]) ||
+            Boolean(permissions["doc.incoming.register"]);
+          setCanCreate(hasCreatePerm);
+        } else {
+          setCanView(false);
         }
-      });
+      })
+      .catch(() => setCanView(false));
   }, []);
 
   async function handleDeleteDocument() {
@@ -297,6 +306,23 @@ export default function IncomingDocumentsPage() {
       ),
     },
   ];
+
+  if (canView === false) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm max-w-lg mx-auto my-12">
+        <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <FileText className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">Không có quyền truy cập</h2>
+        <p className="text-sm text-slate-500 mt-2 mb-6">
+          Tài khoản của bạn hiện không có quyền xem hoặc xử lý văn bản đến. Vui lòng liên hệ Quản trị viên nếu cần cấp lại quyền.
+        </p>
+        <Link href="/dashboard">
+          <Button variant="outline">Quay lại Bàn làm việc</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -16,6 +16,7 @@ import { incomingDocumentSubmissionSchema } from "@/modules/document/schema";
 import {
   incomingScope,
   hasRolePermission,
+  isCitizen,
 } from "@/modules/document/incoming/access";
 import { nextIncomingNumber } from "@/modules/document/incoming/workflow";
 import { claimUpload } from "@/lib/storage/claim-upload";
@@ -23,6 +24,18 @@ import { claimUpload } from "@/lib/storage/claim-upload";
 export async function GET(request: NextRequest) {
   try {
     const ctx = await requireAuth();
+
+    const canView =
+      ctx.roleCodes.includes("ADMIN") ||
+      isCitizen(ctx) ||
+      ctx.permissions.has(Permissions.INCOMING_VIEW) ||
+      ctx.permissions.has(Permissions.INCOMING_CREATE);
+    if (!canView) {
+      throw new BusinessError(
+        "FORBIDDEN",
+        "Bạn không có quyền xem danh sách văn bản đến.",
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -102,13 +115,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const ctx = await requireAuth();
-    const isStaff = ctx.roleCodes.some((r) =>
-      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
-    );
-    if (!isStaff)
+    const canCreate =
+      ctx.roleCodes.includes("ADMIN") ||
+      ctx.permissions.has(Permissions.INCOMING_CREATE) ||
+      ctx.permissions.has(Permissions.INCOMING_REGISTER);
+    if (!canCreate)
       throw new BusinessError(
         "FORBIDDEN",
-        "Bạn không có quyền tiếp nhận văn bản đến.",
+        "Bạn không có quyền tiếp nhận hoặc vào sổ văn bản đến.",
       );
     const body = await request.json();
     const parsed = incomingDocumentSubmissionSchema.safeParse({

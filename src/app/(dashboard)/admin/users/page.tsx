@@ -900,7 +900,7 @@ export default function AdminUsersPage() {
           <ShieldCheck className="h-4 w-4" />
           <span>Phân quyền theo Vai trò (Role Matrix)</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-700 font-mono">
-            {matrixRoles.length || roles.length || 6} vai trò
+            {matrixRoles.length > 0 ? matrixRoles.length : 4} vai trò
           </span>
         </button>
       </div>

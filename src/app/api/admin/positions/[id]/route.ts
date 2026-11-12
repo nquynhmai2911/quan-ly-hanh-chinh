@@ -63,7 +63,7 @@ export async function DELETE(
       where: { id },
       include: {
         _count: {
-          select: { userPositions: { where: { endedAt: null } } },
+          select: { userPositions: true },
         },
       },
     });
@@ -73,20 +73,30 @@ export async function DELETE(
     }
 
     if (existing._count.userPositions > 0) {
-      // Nếu còn cán bộ giữ chức danh này, chỉ chuyển trạng thái ngừng hoạt động
+      // Nếu có cán bộ giữ chức danh này (hiện tại hoặc lịch sử), chỉ chuyển trạng thái ngừng hoạt động
       const updated = await prisma.position.update({
         where: { id },
         data: { isActive: false },
       });
       return successResponse({
-        message: `Chức danh đang có ${existing._count.userPositions} cán bộ đảm nhiệm, đã chuyển sang trạng thái tạm dừng.`,
+        message: `Chức danh đã được liên kết với hồ sơ cán bộ, đã chuyển sang trạng thái tạm dừng an toàn.`,
         data: updated,
       });
     }
 
-    await prisma.position.delete({
-      where: { id },
-    });
+    try {
+      await prisma.position.delete({
+        where: { id },
+      });
+    } catch {
+      await prisma.position.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      return successResponse({
+        message: `Chức danh đã chuyển sang trạng thái tạm dừng an toàn.`,
+      });
+    }
 
     return successResponse({ message: "Xóa chức danh thành công." });
   } catch (error) {

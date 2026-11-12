@@ -64,6 +64,9 @@ export const createOutgoingDraftSchema = z.object({
   signerName: z.string().max(100).optional().nullable(),
   signerPosition: z.string().max(100).optional().nullable(),
   recipientsSummary: z.string().max(500).optional().nullable(),
+  recipientType: z.enum(["SPECIALIST", "CITIZEN", "OTHER"]).default("OTHER"),
+  recipientId: z.string().optional().nullable(),
+  relatedDocumentId: z.string().optional().nullable(),
   sendType: z.string().max(50).optional().nullable(),
   summaryNotes: z.string().max(1000).optional().nullable(),
 });

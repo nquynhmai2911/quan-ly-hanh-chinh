@@ -14,7 +14,7 @@ export async function GET() {
       throw new BusinessError("FORBIDDEN");
     }
 
-    const [people, units, books] = await Promise.all([
+    const [people, units, books, citizens] = await Promise.all([
       prisma.user.findMany({
         where: {
           isActive: true,
@@ -64,9 +64,21 @@ export async function GET() {
         select: { id: true, name: true, code: true },
         orderBy: { name: "asc" },
       }),
+      prisma.user.findMany({
+        where: {
+          isActive: true,
+          positions: {
+            some: {
+              roles: { some: { role: { code: "CITIZEN" } } },
+            },
+          },
+        },
+        select: { id: true, fullName: true, email: true, employeeCode: true },
+        orderBy: { fullName: "asc" },
+      }),
     ]);
 
-    return successResponse({ people, units, books });
+    return successResponse({ people, units, books, citizens });
   } catch (error) {
     return errorResponse(error);
   }

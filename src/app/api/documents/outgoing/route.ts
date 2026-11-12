@@ -132,6 +132,9 @@ export async function POST(request: NextRequest) {
       signerName,
       signerPosition,
       recipientsSummary,
+      recipientType,
+      recipientId,
+      relatedDocumentId,
       sendType,
       summaryNotes,
     } = parsed.data;
@@ -199,6 +202,61 @@ export async function POST(request: NextRequest) {
           files: { create: files },
         },
       });
+
+      // Xử lý luồng nhận theo 2 nhánh: Chuyên viên (Nhiệm vụ/Chỉ đạo nội bộ) hoặc Người dân (Phản hồi/Kết quả)
+      if (recipientType === "SPECIALIST" && recipientId) {
+        const specUser = await tx.user.findUnique({
+          where: { id: recipientId },
+          include: { positions: { where: { endedAt: null } } },
+        });
+        if (specUser) {
+          await tx.documentHandler.create({
+            data: {
+              documentId: doc.id,
+              assignerId: ctx.userId,
+              assigneeId: specUser.id,
+              unitId: specUser.positions[0]?.unitId || draftUnitId,
+              role: "MAIN",
+              instruction: summaryNotes || "Nhận chỉ đạo, nhiệm vụ, văn bản nội bộ",
+            },
+          });
+          await tx.notification.create({
+            data: {
+              recipientId: specUser.id,
+              actorId: ctx.userId,
+              documentId: doc.id,
+              type: "DOC_ASSIGNED",
+              title: "Chỉ đạo / Văn bản đi nội bộ mới",
+              content: `Bạn nhận được chỉ đạo/văn bản nội bộ: "${title}"`,
+            },
+          });
+        }
+      } else if (recipientType === "CITIZEN" && recipientId) {
+        const citizenUser = await tx.user.findUnique({
+          where: { id: recipientId },
+        });
+        if (citizenUser) {
+          if (relatedDocumentId) {
+            await tx.documentRelation.create({
+              data: {
+                sourceDocumentId: relatedDocumentId,
+                targetDocumentId: doc.id,
+                relationType: "REPLY_TO",
+              },
+            });
+          }
+          await tx.notification.create({
+            data: {
+              recipientId: citizenUser.id,
+              actorId: ctx.userId,
+              documentId: doc.id,
+              type: "DOC_ASSIGNED",
+              title: "Văn bản phản hồi / kết quả giải quyết",
+              content: `Cơ quan đã ban hành văn bản phản hồi / kết quả: "${title}"`,
+            },
+          });
+        }
+      }
 
       // Tạo chuỗi duyệt nối tiếp mặc định
       const deptHead =

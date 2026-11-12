@@ -306,6 +306,9 @@ async function main() {
     SPECIALIST: [
       "doc.incoming.view",
       "doc.incoming.create",
+      "doc.incoming.register",
+      "doc.incoming.forward",
+      "doc.incoming.assign",
       "doc.incoming.process",
       "doc.outgoing.view",
       "doc.outgoing.create",

@@ -35,12 +35,14 @@ export const mayReport = (ctx: AuthContext, doc: IncomingDocument) =>
   doc.status === "PROCESSING" &&
   !doc.isLocked &&
   ctx.permissions.has(Permissions.INCOMING_PROCESS) &&
-  doc.handlers.some(
+  (doc.handlers.some(
     (h) =>
       h.assigneeId === ctx.userId &&
       h.role !== "INFO" &&
       ["ASSIGNED", "PROCESSING", "RETURNED"].includes(h.status),
-  );
+  ) ||
+    (hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS) &&
+      !doc.handlers.length));
 
 export function incomingActions(
   ctx: AuthContext,
@@ -60,7 +62,10 @@ export function incomingActions(
       requiresReason,
       isOptimisticAllowed: false,
     });
-  const clerk = hasRolePermission(ctx, "CLERK", Permissions.INCOMING_FORWARD);
+  const clerk =
+    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_FORWARD) ||
+    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_FORWARD) ||
+    hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS);
   const leader =
     hasRolePermission(ctx, "LEADER", Permissions.INCOMING_ANNOTATE) &&
     (isAdmin(ctx) || doc.workflow?.leaderId === ctx.userId);
@@ -72,7 +77,9 @@ export function incomingActions(
       doc.workflow?.leaderId === ctx.userId);
   if (
     doc.status === "SUBMITTED" &&
-    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_REGISTER)
+    (hasRolePermission(ctx, "CLERK", Permissions.INCOMING_REGISTER) ||
+      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_REGISTER) ||
+      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS))
   )
     add("RECEIVE_CITIZEN", "RECEIVED");
   if (doc.status === "RECEIVED" && clerk) {
@@ -96,10 +103,13 @@ export function incomingActions(
     doc.status === "PROCESSING" &&
     allReported &&
     (head ||
+      leader ||
+      isAdmin(ctx) ||
       (doc.handlers.some(
         (h) => h.assigneeId === ctx.userId && h.role === "MAIN",
       ) &&
-        ctx.permissions.has(Permissions.INCOMING_PROCESS)))
+        ctx.permissions.has(Permissions.INCOMING_PROCESS)) ||
+      hasRolePermission(ctx, "SPECIALIST", Permissions.INCOMING_PROCESS))
   )
     add("SUBMIT_REVIEW", "PENDING_REVIEW");
   if (
@@ -325,7 +335,7 @@ export async function transitionIncoming(
         );
       const specialist = await requireRecipient(
         tx,
-        input.headId,
+        input.headId || ctx.userId,
         "SPECIALIST",
         input.unitId,
       );
@@ -455,12 +465,36 @@ export async function transitionIncoming(
         data: { headId: null, unitId: null },
       });
     } else if (input.action === "SUBMIT_REVIEW") {
-      if (!doc.workflow?.headId && !doc.workflow?.leaderId)
-        throw new BusinessError(
-          "CONFLICT",
-          "Hồ sơ chưa có người chịu trách nhiệm duyệt.",
-        );
-      recipients = [doc.workflow.leaderId || doc.workflow.headId];
+      if (!doc.workflow?.headId && !doc.workflow?.leaderId) {
+        const defaultLeader = await tx.user.findFirst({
+          where: {
+            isActive: true,
+            positions: {
+              some: {
+                startedAt: { lte: new Date() },
+                endedAt: null,
+                roles: { some: { role: { code: "LEADER", isActive: true } } },
+              },
+            },
+          },
+        });
+        if (defaultLeader) {
+          if (doc.workflow) {
+            await tx.incomingWorkflow.update({
+              where: { documentId: id },
+              data: { leaderId: defaultLeader.id },
+            });
+          }
+          recipients = [defaultLeader.id];
+        } else {
+          throw new BusinessError(
+            "CONFLICT",
+            "Hồ sơ chưa có người chịu trách nhiệm duyệt.",
+          );
+        }
+      } else {
+        recipients = [doc.workflow.leaderId || doc.workflow.headId];
+      }
     } else if (input.action === "REJECT_REPORT") {
       await tx.documentHandler.updateMany({
         where: { documentId: id, role: { not: "INFO" } },
@@ -510,9 +544,20 @@ export async function reportIncoming(
         "FORBIDDEN",
         "Bạn không có nhiệm vụ cần báo cáo ở bước hiện tại.",
       );
-    const handler = doc.handlers.find(
+    let handler = doc.handlers.find(
       (h) => h.assigneeId === ctx.userId && h.role !== "INFO",
-    )!;
+    );
+    if (!handler) {
+      handler = await tx.documentHandler.create({
+        data: {
+          documentId: id,
+          assigneeId: ctx.userId,
+          assignerId: ctx.userId,
+          role: "MAIN",
+          instruction: "Chuyên viên thụ lý giải quyết",
+        },
+      });
+    }
     const updated = await tx.documentHandler.update({
       where: { id: handler.id },
       data: {

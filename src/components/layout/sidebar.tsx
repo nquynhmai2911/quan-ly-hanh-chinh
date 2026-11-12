@@ -57,21 +57,9 @@ export function Sidebar({
       title: "ĐIỀU HÀNH",
       items: [
         {
-          name: "Trung tâm điều hành",
+          name: "Bàn làm việc & Điều hành",
           href: "/dashboard",
           icon: LayoutDashboard,
-          badge: null,
-        },
-        {
-          name: "Bàn làm việc (Việc của tôi)",
-          href: "/tasks",
-          icon: CheckCircle2,
-          badge: null,
-        },
-        {
-          name: "Báo cáo thống kê",
-          href: "/reports",
-          icon: BarChart3,
           badge: null,
         },
       ],
@@ -207,7 +195,10 @@ export function Sidebar({
               </div>
             )}
             {section.items.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive =
+                pathname.startsWith(item.href) ||
+                (item.href === "/dashboard" &&
+                  ["/tasks", "/reports"].some((p) => pathname.startsWith(p)));
               const Icon = item.icon;
               return (
                 <Link

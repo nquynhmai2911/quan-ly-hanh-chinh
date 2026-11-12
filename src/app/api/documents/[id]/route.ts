@@ -7,6 +7,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { BusinessError } from "@/lib/errors";
 import { z } from "zod";
+import { documentScope } from "@/modules/document/access";
 
 const updateDocumentSchema = z.object({
   title: z.string().trim().min(3, "Trích yếu phải từ 3 ký tự trở lên.").max(1000).optional(),
@@ -31,8 +32,8 @@ export async function GET(
     const ctx = await requireAuth();
     const { id } = await params;
 
-    const doc = await prisma.document.findUnique({
-      where: { id },
+    const doc = await prisma.document.findFirst({
+      where: { AND: [{ id }, await documentScope(ctx)] },
       include: {
         documentBook: true,
         documentType: true,
@@ -84,7 +85,7 @@ export async function PATCH(
 
     // Kiểm tra quyền: Admin, người tạo, hoặc nhân sự công vụ
     const isStaff = ctx.roleCodes.some((r) =>
-      ["ADMIN", "CLERK", "LEADER", "DEPT_HEAD", "SPECIALIST"].includes(r),
+      ["ADMIN", "LEADER", "SPECIALIST"].includes(r),
     );
     if (!isStaff && doc.creatorId !== ctx.userId) {
       throw new BusinessError("FORBIDDEN", "Bạn không có quyền chỉnh sửa văn bản này.");

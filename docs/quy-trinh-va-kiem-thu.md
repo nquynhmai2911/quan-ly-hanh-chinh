@@ -5,19 +5,19 @@
 | Bước | Người được thao tác | Dữ liệu phải lưu |
 | --- | --- | --- |
 | Nộp trực tuyến | Người dân, hoặc quản trị viên hỗ trợ | Mã hồ sơ duy nhất, người nộp, thông tin liên hệ và toàn bộ tệp gốc |
-| Tiếp nhận, vào sổ | Văn thư | Sổ, số đến, năm, ngày tiếp nhận, người tiếp nhận |
-| Trình lãnh đạo | Văn thư | Lãnh đạo cụ thể; cần số đến và tệp gốc |
-| Bút phê, phân phối | Lãnh đạo được chọn | Ý kiến chỉ đạo, phòng ban và trưởng phòng cụ thể, hạn xử lý nếu có |
-| Phân công | Trưởng phòng được giao | Cán bộ trong phòng được giao; đúng một chủ trì, có thể thêm phối hợp và nhận để biết |
+| Tiếp nhận, vào sổ | Chuyên viên hoặc Lãnh đạo | Sổ, số đến, năm, ngày tiếp nhận, người tiếp nhận |
+| Trình lãnh đạo | Chuyên viên hoặc Lãnh đạo | Lãnh đạo cụ thể; cần số đến và tệp gốc |
+| Bút phê, phân phối | Lãnh đạo được chọn | Ý kiến chỉ đạo, phòng ban và lãnh đạo phụ trách đơn vị, hạn xử lý nếu có |
+| Phân công | Lãnh đạo phụ trách đơn vị | Cán bộ trong phòng được giao; đúng một chủ trì, có thể thêm phối hợp và nhận để biết |
 | Báo cáo | Cán bộ chủ trì/phối hợp được phân công | Báo cáo của chính người đăng nhập; người nhận để biết không được báo cáo |
-| Trình duyệt kết thúc | Chủ trì hoặc trưởng phòng phụ trách | Tất cả người chủ trì/phối hợp phải báo cáo |
-| Duyệt hoặc yêu cầu làm lại | Trưởng phòng phụ trách | Quyết định, lý do trả lại; hoàn thành sẽ khóa hồ sơ |
+| Trình duyệt kết thúc | Chủ trì hoặc Lãnh đạo phụ trách | Tất cả người chủ trì/phối hợp phải báo cáo |
+| Duyệt hoặc yêu cầu làm lại | Lãnh đạo phụ trách | Quyết định, lý do trả lại; hoàn thành sẽ khóa hồ sơ |
 
-Quản trị viên hỗ trợ thao tác nhưng vẫn phải tuân thủ trạng thái, tệp và các điều kiện nghiệp vụ. Lãnh đạo có thể trả lại văn thư; trưởng phòng có thể trả lại lãnh đạo trước khi phân công. Khi báo cáo bị trả lại, các cán bộ chủ trì/phối hợp phải nộp lại trước khi trình duyệt.
+Quản trị viên hỗ trợ thao tác nhưng vẫn phải tuân thủ trạng thái, tệp và các điều kiện nghiệp vụ. Lãnh đạo có thể trả lại bước trước; lãnh đạo đơn vị có thể trả lại lãnh đạo cấp trên trước khi phân công. Khi báo cáo bị trả lại, các cán bộ chủ trì/phối hợp phải nộp lại trước khi trình duyệt.
 
 Danh sách, chi tiết, tra cứu, tệp, thông báo và bàn làm việc dùng người nhận thực tế để kiểm tra quyền. Người dân chỉ xem hồ sơ của mình. Các thao tác thay đổi văn bản được khóa và kiểm tra trong giao dịch cơ sở dữ liệu, rồi mới ghi trạng thái, lịch sử và thông báo.
 
-Hồ sơ cũ đã chuyển bước nhưng chưa có người nhận và nhiệm vụ có nút **Trả lại văn thư** cho quản trị viên, bắt buộc ghi lý do. Sau đó văn thư bổ sung tệp và trình lại theo quy trình. Không tự suy đoán người nhận hay ghép các tệp tải lên cũ vào hồ sơ.
+Hồ sơ cũ đã chuyển bước nhưng chưa có người nhận và nhiệm vụ có nút **Trả lại bước trước** cho quản trị viên, bắt buộc ghi lý do. Sau đó cán bộ phụ trách bổ sung tệp và trình lại theo quy trình. Không tự suy đoán người nhận hay ghép các tệp tải lên cũ vào hồ sơ.
 
 ## Tệp đính kèm
 

@@ -36,7 +36,7 @@ const STANDARD_PRESETS = [
   { name: "Quản trị hệ thống", level: 0, role: "admin", desc: "Quản trị toàn bộ hệ thống" },
   { name: "Lãnh đạo", level: 1, role: "LEADER", desc: "Bút phê, chỉ đạo, duyệt và ký số" },
   { name: "Chuyên viên", level: 2, role: "SPECIALIST", desc: "Thụ lý xử lý, soạn thảo dự thảo" },
-  { name: "Văn thư", level: 3, role: "CLERK", desc: "Vào sổ, tiếp nhận, cấp số & phát hành" },
+  { name: "Người dân", level: 3, role: "CITIZEN", desc: "Nộp hồ sơ trực tuyến, theo dõi tiến độ" },
 ];
 
 export default function AdminPositionsPage() {
@@ -237,7 +237,7 @@ export default function AdminPositionsPage() {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Danh sách chức danh được chuẩn hóa đồng bộ với 4 vai trò chính: <strong>admin</strong>, <strong>Lãnh đạo</strong>, <strong>Chuyên viên</strong>, <strong>Văn thư</strong>.
+            Danh sách chức danh được chuẩn hóa đồng bộ với 4 vai trò chính: <strong>Quản trị viên</strong>, <strong>Lãnh đạo</strong>, <strong>Chuyên viên</strong>, <strong>Người dân</strong>.
           </p>
         </div>
 
@@ -389,7 +389,7 @@ export default function AdminPositionsPage() {
               className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-600 outline-none"
             />
             <p className="text-[11px] text-slate-400 mt-1">
-              0: Admin • 1: Lãnh đạo • 2: Chuyên viên • 3: Văn thư
+              0: Admin • 1: Lãnh đạo • 2: Chuyên viên • 3: Người dân
             </p>
           </div>
 

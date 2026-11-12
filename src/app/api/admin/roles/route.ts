@@ -13,13 +13,13 @@ export async function GET() {
   try {
     await requirePermission(Permissions.ADMIN_ROLE_MANAGE);
 
-    // Hệ thống tối ưu hóa 4 vai trò chính: admin, Lãnh đạo, Chuyên viên, Văn thư
-    const TARGET_ROLE_CODES = ["ADMIN", "LEADER", "SPECIALIST", "CLERK"];
+    // Hệ thống tối ưu hóa đúng 4 vai trò chính: Quản trị viên, Lãnh đạo, Chuyên viên, Người dân
+    const TARGET_ROLE_CODES = ["ADMIN", "LEADER", "SPECIALIST", "CITIZEN"];
     const ROLE_SORT_ORDER: Record<string, number> = {
       ADMIN: 1,
       LEADER: 2,
       SPECIALIST: 3,
-      CLERK: 4,
+      CITIZEN: 4,
     };
 
     const [roles, permissions] = await Promise.all([

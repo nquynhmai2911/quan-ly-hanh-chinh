@@ -829,7 +829,7 @@ export default function AdminUsersPage() {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quản trị tài khoản & phân quyền tập trung: Phân quyền theo 4 vai trò chính (Admin, Lãnh đạo, Chuyên viên, Văn thư) và Phân quyền trực tiếp cho từng Tài khoản cá nhân.
+            Quản trị tài khoản & phân quyền tập trung: Phân quyền theo 4 vai trò chính (Quản trị viên, Lãnh đạo, Chuyên viên, Người dân) và Phân quyền trực tiếp cho từng Tài khoản cá nhân.
           </p>
         </div>
 

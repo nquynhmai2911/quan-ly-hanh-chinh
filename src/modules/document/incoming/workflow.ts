@@ -76,7 +76,7 @@ export function incomingActions(
   )
     add("RECEIVE_CITIZEN", "RECEIVED");
   if (doc.status === "RECEIVED" && clerk) {
-    add("CLERK_DISTRIBUTE", "DISTRIBUTED");
+    add("CLERK_DISTRIBUTE", "PROCESSING");
     add("SUBMIT_LEADER", "PENDING_LEADER");
   }
   if (doc.status === "PENDING_LEADER" && leader) {
@@ -323,13 +323,13 @@ export async function transitionIncoming(
           "VALIDATION_ERROR",
           "Vui lòng chọn phòng ban xử lý.",
         );
-      const head = await requireRecipient(
+      const specialist = await requireRecipient(
         tx,
         input.headId,
-        "DEPT_HEAD",
+        "SPECIALIST",
         input.unitId,
       );
-      // Gán lãnh đạo phê duyệt mặc định nếu chưa gán
+      // Gán lãnh đạo cơ quan phê duyệt mặc định nếu chưa gán
       let leaderId = doc.workflow?.leaderId;
       if (!leaderId) {
         const defaultLeader = await tx.user.findFirst({
@@ -346,28 +346,57 @@ export async function transitionIncoming(
         });
         if (defaultLeader) leaderId = defaultLeader.id;
       }
+      // Gán Trưởng phòng đơn vị
+      const unitHead = await tx.user.findFirst({
+        where: {
+          isActive: true,
+          positions: {
+            some: {
+              unitId: input.unitId,
+              roles: { some: { role: { code: { in: ["LEADER", "DEPT_HEAD"] }, isActive: true } } },
+            },
+          },
+        },
+      });
+
       await tx.incomingWorkflow.upsert({
         where: { documentId: id },
         create: {
           documentId: id,
           registrarId: ctx.userId,
           leaderId: leaderId || undefined,
-          headId: head.id,
+          headId: unitHead?.id || specialist.id,
           unitId: input.unitId,
-          instruction: reason || "Văn thư phân phối trực tiếp về phòng ban chuyên môn xử lý.",
+          instruction: reason || "Văn thư chuyển Chuyên viên chủ trì giải quyết đúng hạn.",
         },
         update: {
           registrarId: ctx.userId,
           ...(leaderId ? { leaderId } : {}),
-          headId: head.id,
+          headId: unitHead?.id || specialist.id,
           unitId: input.unitId,
-          instruction: reason || "Văn thư phân phối trực tiếp về phòng ban chuyên môn xử lý.",
+          instruction: reason || "Văn thư chuyển Chuyên viên chủ trì giải quyết đúng hạn.",
         },
       });
-      data.processingDeadline =
-        input.processingDeadline || doc.processingDeadline;
-      recipients = [head.id];
-      reason = `Văn thư phân phối về phòng ban cho Trưởng phòng ${head.fullName}: ${reason || "Xử lý theo quy chế"}`;
+
+      const deadline = input.processingDeadline || doc.processingDeadline;
+      // Gán Handler cho Chuyên viên thụ lý để vào thẳng PROCESSING
+      await tx.documentHandler.deleteMany({ where: { documentId: id } });
+      await tx.documentHandler.create({
+        data: {
+          documentId: id,
+          assignerId: ctx.userId,
+          assigneeId: specialist.id,
+          unitId: input.unitId,
+          role: "MAIN",
+          deadline,
+          instruction: reason || "Chuyên viên chủ trì xử lý hồ sơ và báo cáo kết quả trình Lãnh đạo phê duyệt.",
+        },
+      });
+
+      data.processingDeadline = deadline;
+      data.status = "PROCESSING";
+      recipients = [specialist.id];
+      reason = `Văn thư giao Chuyên viên ${specialist.fullName} (${specialist.employeeCode}) chủ trì xử lý: ${reason || "Xử lý theo quy định"}`;
     } else if (input.action === "SUBMIT_LEADER") {
       if (!doc.documentNumber || !doc.documentBookId || !doc.files.length)
         throw new BusinessError(
@@ -426,12 +455,12 @@ export async function transitionIncoming(
         data: { headId: null, unitId: null },
       });
     } else if (input.action === "SUBMIT_REVIEW") {
-      if (!doc.workflow?.headId)
+      if (!doc.workflow?.headId && !doc.workflow?.leaderId)
         throw new BusinessError(
           "CONFLICT",
-          "Hồ sơ chưa có trưởng phòng chịu trách nhiệm duyệt.",
+          "Hồ sơ chưa có người chịu trách nhiệm duyệt.",
         );
-      recipients = [doc.workflow.headId];
+      recipients = [doc.workflow.leaderId || doc.workflow.headId];
     } else if (input.action === "REJECT_REPORT") {
       await tx.documentHandler.updateMany({
         where: { documentId: id, role: { not: "INFO" } },

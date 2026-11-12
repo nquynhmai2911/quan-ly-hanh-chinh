@@ -26,7 +26,7 @@ export const processingLabels: Record<string, string> = {
 };
 const actionLabels: Record<string, string> = {
   RECEIVE_CITIZEN: "Tiếp nhận và vào sổ",
-  CLERK_DISTRIBUTE: "Phân phối về Phòng ban",
+  CLERK_DISTRIBUTE: "Chuyển Chuyên viên xử lý",
   CITIZEN_SUBMIT: "Nộp hồ sơ trực tuyến",
   CREATE_INCOMING: "Tiếp nhận văn bản đến",
   CREATE_OUTGOING_DRAFT: "Tạo dự thảo văn bản đi",
@@ -38,8 +38,8 @@ const actionLabels: Record<string, string> = {
   DEPT_HEAD_RETURN: "Trả lại lãnh đạo",
   HANDLER_REPORT: "Báo cáo kết quả xử lý",
   SPECIALIST_REPORT: "Báo cáo kết quả xử lý",
-  SUBMIT_REVIEW: "Trình duyệt kết quả xử lý",
-  APPROVE_COMPLETE: "Phê duyệt hoàn tất hồ sơ",
+  SUBMIT_REVIEW: "Trình Lãnh đạo phê duyệt",
+  APPROVE_COMPLETE: "Phê duyệt & Trả kết quả cho Người dân",
   REJECT_REPORT: "Yêu cầu bổ sung báo cáo",
   SUBMIT_FOR_REVIEW: "Trình duyệt dự thảo",
   REVIEW_APPROVE: "Duyệt dự thảo",

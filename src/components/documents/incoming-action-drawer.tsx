@@ -115,7 +115,7 @@ export function IncomingActionDrawer({
           }
         }
 
-        // Pre-select unit and department head for LEADER_ANNOTATE or CLERK_DISTRIBUTE
+        // Pre-select unit and specialist/head for LEADER_ANNOTATE or CLERK_DISTRIBUTE
         if (
           action.action === "LEADER_ANNOTATE" ||
           action.action === "CLERK_DISTRIBUTE"
@@ -127,28 +127,44 @@ export function IncomingActionDrawer({
           if (initialUnit) {
             setUnitId(initialUnit.id);
 
-            // Find head in this unit
-            const matchingHeads = pList.filter((p) =>
-              p.positions.some(
-                (pos) =>
-                  pos.unit.id === initialUnit.id &&
-                  pos.roles.some((r) =>
-                    ["LEADER", "DEPT_HEAD"].includes(r.role.code),
-                  ),
-              ),
-            );
-            if (matchingHeads.length > 0) {
-              setHeadId(matchingHeads[0].id);
-            } else {
-              // Fallback to any leader or staff
-              const fallback = pList.filter((p) =>
-                p.positions.some((pos) =>
-                  pos.roles.some((r) =>
-                    ["LEADER", "DEPT_HEAD"].includes(r.role.code),
-                  ),
+            if (action.action === "CLERK_DISTRIBUTE") {
+              // Prioritize specialist in this unit (e.g. CV001)
+              const matchingSpec = pList.filter((p) =>
+                p.positions.some(
+                  (pos) =>
+                    pos.unit.id === initialUnit.id &&
+                    pos.roles.some((r) => r.role.code === "SPECIALIST"),
                 ),
               );
-              if (fallback.length > 0) setHeadId(fallback[0].id);
+              if (matchingSpec.length > 0) {
+                setHeadId(matchingSpec[0].id);
+              } else {
+                setHeadId(pList[0]?.id || "");
+              }
+            } else {
+              // Find head in this unit
+              const matchingHeads = pList.filter((p) =>
+                p.positions.some(
+                  (pos) =>
+                    pos.unit.id === initialUnit.id &&
+                    pos.roles.some((r) =>
+                      ["LEADER", "DEPT_HEAD"].includes(r.role.code),
+                    ),
+                ),
+              );
+              if (matchingHeads.length > 0) {
+                setHeadId(matchingHeads[0].id);
+              } else {
+                // Fallback to any leader or staff
+                const fallback = pList.filter((p) =>
+                  p.positions.some((pos) =>
+                    pos.roles.some((r) =>
+                      ["LEADER", "DEPT_HEAD"].includes(r.role.code),
+                    ),
+                  ),
+                );
+                if (fallback.length > 0) setHeadId(fallback[0].id);
+              }
             }
           }
         }

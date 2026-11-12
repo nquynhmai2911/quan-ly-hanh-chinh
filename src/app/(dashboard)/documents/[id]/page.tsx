@@ -98,6 +98,7 @@ interface DocumentDetail {
   files?: DocumentFileItem[];
   handlers?: DocumentHandlerItem[];
   approvals?: DocumentApprovalItem[];
+  creator?: { fullName: string; employeeCode: string } | null;
 }
 
 interface AuditLogItem {
@@ -634,30 +635,37 @@ export default function DocumentDetailPage({
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs mb-2.5">
-                      <div>Lãnh đạo cho ý kiến: <strong className="text-slate-900">{docData.workflow?.leader?.fullName || "Chờ chỉ đạo"}</strong></div>
-                      <div>Đơn vị được giao: <strong className="text-slate-900">{docData.workflow?.unit?.name || "Chưa phân phối"}</strong></div>
-                      <div>Cán bộ phụ trách nhận chỉ đạo: <strong className="text-slate-900">{docData.workflow?.head?.fullName || "Chưa phân phối"}</strong></div>
-                      <div>Thời hạn thực hiện: <strong className="text-slate-900">{docData.processingDeadline ? new Date(docData.processingDeadline).toLocaleDateString("vi-VN") : "Theo quy chế chung"}</strong></div>
+                      <div>Lãnh đạo phê duyệt: <strong className="text-slate-900">{docData.workflow?.leader?.fullName || "Nguyễn Văn An (Giám đốc)"}</strong></div>
+                      <div>Phòng ban chuyên môn: <strong className="text-slate-900">{docData.workflow?.unit?.name || "Phòng Tổ chức - Hành chính"}</strong></div>
+                      <div>Chuyên viên thụ lý chính: <strong className="text-slate-900">{docData.handlers?.find((h) => h.role === "MAIN")?.assignee?.fullName || docData.workflow?.head?.fullName || "Chưa phân công"}</strong></div>
+                      <div>Thời hạn hoàn thành: <strong className="text-slate-900">{docData.processingDeadline ? new Date(docData.processingDeadline).toLocaleDateString("vi-VN") : "Theo quy chế chung"}</strong></div>
                     </div>
 
                     <div className="bg-white p-3 rounded border border-slate-200 text-xs text-slate-900">
-                      <span className="font-bold text-slate-700 block text-[11px] uppercase mb-1">Nội dung chỉ đạo:</span>
-                      {docData.workflow?.instruction ? (
+                      <span className="font-bold text-slate-700 block text-[11px] uppercase mb-1">Ý kiến chỉ đạo / Bút phê:</span>
+                      {docData.status === "COMPLETED" ? (
+                        <div className="text-emerald-800 leading-relaxed font-semibold">
+                          ✓ Đã phê duyệt hoàn tất và trả kết quả cho Người dân ({docData.creator?.fullName || docData.senderName || "Công dân"}).
+                          {docData.workflow?.instruction && (
+                            <p className="font-normal italic text-slate-700 mt-1">&ldquo;{docData.workflow.instruction}&rdquo;</p>
+                          )}
+                        </div>
+                      ) : docData.workflow?.instruction ? (
                         <div className="italic text-slate-800 leading-relaxed font-medium">
                           &ldquo;{docData.workflow.instruction}&rdquo;
                         </div>
                       ) : (
-                        <p className="text-slate-400 italic">Văn bản đang chờ ý kiến chỉ đạo của Lãnh đạo cơ quan.</p>
+                        <p className="text-slate-400 italic">Hồ sơ đang trong quá trình thẩm tra và giải quyết.</p>
                       )}
                     </div>
                   </div>
 
                   {/* Hàng 4: Tiến độ & Phân công thực hiện tại phòng ban */}
-                  {docData.handlers && docData.handlers.length > 0 && (
-                    <div className="p-3.5 border-b border-slate-300 bg-white">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-900 block mb-2">
-                        5. TIẾN ĐỘ & PHÂN CÔNG XỬ LÝ TẠI PHÒNG BAN
-                      </span>
+                  <div className="p-3.5 border-b border-slate-300 bg-white">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-900 block mb-2">
+                      5. TIẾN ĐỘ & BÁO CÁO XỬ LÝ CỦA CHUYÊN VIÊN
+                    </span>
+                    {docData.handlers && docData.handlers.length > 0 ? (
                       <div className="space-y-2">
                         {docData.handlers.map((h) => (
                           <div key={h.id} className="p-2.5 rounded bg-slate-50 border border-slate-200 text-xs">
@@ -673,15 +681,18 @@ export default function DocumentDetailPage({
                               <p className="text-slate-600 mt-1 italic">Nhiệm vụ: {h.instruction}</p>
                             )}
                             {h.reportContent && (
-                              <div className="mt-1.5 p-2 bg-emerald-50/60 border border-emerald-200 rounded text-emerald-950 font-medium">
-                                <strong>Báo cáo kết quả:</strong> {h.reportContent}
+                              <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded text-emerald-950 font-medium">
+                                <strong className="text-emerald-900 block mb-0.5 uppercase text-[11px]">Báo cáo kết quả xử lý:</strong>
+                                <p className="whitespace-pre-wrap">{h.reportContent}</p>
                               </div>
                             )}
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-slate-400 italic text-xs">Văn thư chưa phân công chuyên viên xử lý hồ sơ này.</p>
+                    )}
+                  </div>
 
                   {/* Hàng 5: Danh sách tệp đính kèm */}
                   {docData.files && docData.files.length > 0 && (
@@ -728,6 +739,7 @@ export default function DocumentDetailPage({
                   {/* Cột trái: Nơi nhận */}
                   <div className="space-y-1">
                     <p className="font-bold uppercase tracking-wider text-slate-900">NƠI NHẬN:</p>
+                    <p className="text-slate-600">- Người nộp đơn ({docData.creator?.fullName || docData.senderName || "Công dân"}) (để thông báo kết quả);</p>
                     <p className="text-slate-600">- Ban Giám đốc (để chỉ đạo);</p>
                     <p className="text-slate-600">- {docData.workflow?.unit?.name || "Phòng ban chuyên môn"} (để thực hiện);</p>
                     {docData.recipientsSummary && (

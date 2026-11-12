@@ -25,7 +25,9 @@ export function incomingScope(ctx: AuthContext): Prisma.DocumentWhereInput {
     };
   if (
     isAdmin(ctx) ||
-    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_VIEW)
+    hasRolePermission(ctx, "CLERK", Permissions.INCOMING_VIEW) ||
+    (hasRolePermission(ctx, "LEADER", Permissions.INCOMING_VIEW) &&
+      ctx.permissions.get(Permissions.INCOMING_VIEW) === "ALL")
   )
     return { direction: "INCOMING" };
   if (!ctx.permissions.has(Permissions.INCOMING_VIEW))
